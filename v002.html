@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text Annotation Tool (ContentEditable)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom style for contenteditable span when editing */
+        .editable-word {
+            outline: none; /* Remove default browser outline */
+            /* Tailwind classes will handle border, focus rings, etc. */
+            min-width: 60px; /* Minimum width for small words */
+            display: inline-block; /* Important for proper layout */
+            vertical-align: baseline; /* Align with surrounding text */
+        }
+        kbd {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            padding: 0.25rem 0.5rem;
+            background-color: #e5e7eb; /* gray-200 */
+            border-radius: 0.25rem;
+            border: 1px solid #d1d5db; /* gray-300 */
+            box-shadow: 0 1px 1px rgba(0,0,0,0.05);
+            color: #374151; /* gray-700 */
+            font-size: 0.875em; /* Slightly smaller */
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gray-100 flex flex-col items-center justify-center p-4 font-sans">
+
+    <div id="appContainer" class="bg-white shadow-xl rounded-lg p-6 md:p-8 w-full max-w-3xl">
+        <h1 class="text-2xl font-bold text-center text-gray-700 mb-6">Sentence Correction (ContentEditable)</h1>
+
+        <div>
+            <p class="text-sm font-semibold text-gray-700 mb-1">Source (المصدر)</p>
+            <div id="sourceSentence" dir="rtl" class="mb-4 p-3 bg-slate-200 rounded text-slate-800 text-lg min-h-[40px]"></div>
+        </div>
+
+        <div>
+            <p class="text-sm font-semibold text-gray-700 mb-1">LLM Output (ترجمة الآلة)</p>
+            <div id="llmTargetSentence" dir="rtl" class="mb-4 p-3 bg-amber-100 rounded text-amber-800 text-lg min-h-[40px]"></div>
+        </div>
+
+        <div>
+            <p class="text-sm font-semibold text-gray-700 mb-1">Your Correction (التصحيح)</p>
+            <div id="correctionArea" dir="rtl" class="mb-6 p-3 border-2 border-blue-500 rounded text-lg min-h-[70px] flex flex-wrap gap-x-2 gap-y-1 items-center focus:outline-none" tabindex="0">
+                <!-- Words will be injected here -->
+            </div>
+        </div>
+
+        <div class="flex flex-col sm:flex-row justify-end gap-2">
+            <button id="resetBtn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Reset Current (Esc)</button>
+            <button id="submitBtn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Submit & Next (Ctrl+Enter)</button>
+        </div>
+
+        <div id="statusText" class="text-sm text-gray-600 mt-6 text-center"></div>
+    </div>
+
+    <!-- Help Button -->
+    <button id="helpToggleBtn" title="Help (? or F1)" class="fixed bottom-4 right-4 bg-sky-500 hover:bg-sky-600 text-white font-bold p-2 rounded-full shadow-lg w-10 h-10 flex items-center justify-center text-xl z-40">?</button>
+
+    <!-- Help Modal -->
+    <div id="helpModal" class="fixed inset-0 bg-gray-800 bg-opacity-75 hidden items-center justify-center p-4 z-50" aria-modal="true" role="dialog">
+        <div class="bg-white p-6 md:p-8 rounded-lg shadow-xl max-w-xl w-full">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold text-gray-800">Help & Shortcuts</h2>
+                <button id="closeHelpModalBtn" class="text-gray-500 hover:text-gray-700 text-3xl leading-none" aria-label="Close help modal">&times;</button>
+            </div>
+            <div class="text-gray-700 space-y-3 text-sm sm:text-base">
+                <p><strong>Word Navigation & Selection (in "Your Correction" area):</strong></p>
+                <ul class="list-disc list-inside ml-4 space-y-1">
+                    <li><kbd>←</kbd> / <kbd>→</kbd>: Select previous/next word. Cycles through words.</li>
+                    <li>Click on a word: Selects it.</li>
+                </ul>
+                <p><strong>Word Correction:</strong></p>
+                <ul class="list-disc list-inside ml-4 space-y-1">
+                    <li><kbd>Enter</kbd> / <kbd>F2</kbd> / Double-click (on selected word): Start editing the word.</li>
+                    <li>While editing:
+                        <ul class="list-['◦'] list-inside ml-6 space-y-1">
+                           <li>Type your correction.</li>
+                           <li><kbd>Enter</kbd>: Confirm word change (moves to next word if not last).</li>
+                           <li><kbd>Esc</kbd>: Cancel word change and revert to original.</li>
+                        </ul>
+                    </li>
+                    <li><kbd>Delete</kbd> / <kbd>Backspace</kbd> (on selected word): Delete the word.</li>
+                </ul>
+                <p><strong>Sentence Actions:</strong></p>
+                <ul class="list-disc list-inside ml-4 space-y-1">
+                    <li><kbd>Ctrl</kbd> + <kbd>Enter</kbd>: Submit current correction and load next sentence.</li>
+                    <li><kbd>Esc</kbd> (when not editing a word and help is closed): Reset current sentence to LLM's original translation.</li>
+                </ul>
+                 <p><strong>Help Dialog:</strong></p>
+                <ul class="list-disc list-inside ml-4 space-y-1">
+                    <li>Click the <span class="inline-flex items-center justify-center bg-sky-500 text-white font-bold w-5 h-5 rounded-full text-xs">?</span> button: Show/hide this help.</li>
+                    <li><kbd>?</kbd> (Shift + /) or <kbd>F1</kbd>: Show/hide this help.</li>
+                    <li><kbd>Esc</kbd> (when help is open): Close this help.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        const sentencePairs = [
+            { source: "لماذا فعلت هذا الشيء يا رجل", target: "ليش عملت هذا الشيء يا رجال" },
+            { source: "أين كنت عندما حدث ذلك؟", target: "وينك يوم صار هالشي؟" },
+            { source: "هذا الطعام لذيذ جدا.", target: "هالأكل وايد حلو." },
+            { source: "هل يمكنك مساعدتي من فضلك؟", target: "تقدر تساعدني لو سمحت؟" },
+            { source: "سأراك لاحقاً.", target: "أشوفك بعدين." },
+            { source: "ما هو اسمك؟", target: "شنو اسمك؟" },
+            { source: "أنا بخير، شكراً لك.", target: "أنا زين، مشكور." }
+        ];
+
+        let currentSentenceIndex = 0;
+        let correctedWords = [];
+        let selectedWordIndex = -1;
+        let isEditingWord = false;
+        let activeEditableElement = null; // Changed from activeInputElement
+        let originalTargetForReset = "";
+        let allCompleted = false;
+
+        const sourceSentenceEl = document.getElementById('sourceSentence');
+        const llmTargetSentenceEl = document.getElementById('llmTargetSentence');
+        const correctionAreaEl = document.getElementById('correctionArea');
+        const submitBtn = document.getElementById('submitBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const statusTextEl = document.getElementById('statusText');
+        const appContainer = document.getElementById('appContainer');
+
+        const helpToggleBtn = document.getElementById('helpToggleBtn');
+        const helpModal = document.getElementById('helpModal');
+        const closeHelpModalBtn = document.getElementById('closeHelpModalBtn');
+        let isHelpModalOpen = false;
+        let elementThatHadFocusBeforeModal;
+
+
+        function normalizeWords(sentence) {
+            return sentence.split(/\s+/).filter(word => word.length > 0);
+        }
+
+        function renderCorrectionArea() {
+            correctionAreaEl.innerHTML = '';
+            if (correctedWords.length === 0 && !isEditingWord) {
+                 correctionAreaEl.innerHTML = `<span class="text-gray-400 italic">Sentence is empty. Use controls if needed.</span>`;
+                 selectedWordIndex = -1; 
+                 return;
+            }
+
+            correctedWords.forEach((word, index) => {
+                const wordSpan = document.createElement('span');
+                wordSpan.textContent = word;
+                wordSpan.dataset.index = index;
+                // Base classes for non-editing word spans
+                wordSpan.className = `p-1 rounded cursor-pointer hover:bg-sky-100 transition-colors duration-150 ease-in-out inline-block`;
+                
+                if (index === selectedWordIndex && !isEditingWord) {
+                    wordSpan.classList.add('bg-sky-600', 'text-white');
+                    wordSpan.classList.remove('hover:bg-sky-100');
+                }
+                wordSpan.addEventListener('click', () => {
+                    if (isEditingWord) return;
+                    selectWord(index);
+                });
+                wordSpan.addEventListener('dblclick', () => {
+                    if (isEditingWord) return;
+                    selectWord(index); 
+                    initiateWordEdit();
+                });
+                correctionAreaEl.appendChild(wordSpan);
+            });
+            const flexGapFix = document.createElement('span');
+            flexGapFix.className = "w-0 h-0 p-0 m-0";
+            correctionAreaEl.appendChild(flexGapFix);
+        }
+
+        function selectWord(index) {
+            if (isEditingWord) return;
+            if (correctedWords.length === 0) selectedWordIndex = -1;
+            else if (index >= 0 && index < correctedWords.length) selectedWordIndex = index;
+            else if (index < 0 && correctedWords.length > 0) selectedWordIndex = 0;
+            else if (correctedWords.length > 0) selectedWordIndex = correctedWords.length - 1;
+            else selectedWordIndex = -1;
+            
+            renderCorrectionArea();
+            const selectedSpan = correctionAreaEl.querySelector(`span[data-index='${selectedWordIndex}']`);
+            if (selectedSpan) {
+                selectedSpan.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+            }
+        }
+        
+        function moveSelection(direction) {
+            if (isEditingWord || correctedWords.length === 0) return;
+            let newIndex = selectedWordIndex + direction;
+            if (newIndex < 0) newIndex = correctedWords.length - 1; 
+            if (newIndex >= correctedWords.length) newIndex = 0; 
+            selectWord(newIndex);
+        }
+
+        function initiateWordEdit() {
+            console.log(`[initiateWordEdit] Start. isEditingWord: ${isEditingWord}, Selected index: ${selectedWordIndex}.`);
+            if (isEditingWord || selectedWordIndex < 0 || selectedWordIndex >= correctedWords.length) return;
+
+            isEditingWord = true;
+            console.log(`[initiateWordEdit] isEditingWord set to: ${isEditingWord}`);
+            const wordToEdit = correctedWords[selectedWordIndex];
+            const wordSpanToReplace = correctionAreaEl.querySelector(`span[data-index='${selectedWordIndex}']`);
+
+            if (!wordSpanToReplace) {
+                isEditingWord = false; return;
+            }
+
+            activeEditableElement = document.createElement('span');
+            activeEditableElement.contentEditable = "true";
+            activeEditableElement.textContent = wordToEdit;
+            // Apply styling to make it look like an input
+            activeEditableElement.className = 'editable-word p-1 border border-blue-700 rounded shadow-sm focus:ring-2 focus:ring-blue-500 text-lg bg-white';
+            // Inherit text direction if needed, or set explicitly if different
+            activeEditableElement.dir = correctionAreaEl.dir;
+
+            activeEditableElement.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault(); // Prevent newline in contenteditable
+                    e.stopPropagation();
+                    commitWordEdit();
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    cancelWordEdit();
+                }
+                // Allow other keys (like arrows for caret movement within the word) to function normally
+            });
+
+            activeEditableElement.addEventListener('blur', () => {
+                 console.log(`[Editable Blur] Fired. isEditingWord: ${isEditingWord}, Active element: ${activeEditableElement ? activeEditableElement.textContent : 'null'}`);
+                // Delay slightly to allow Enter/Escape handlers to fire first if they were the cause of blur
+                setTimeout(() => {
+                    if (isEditingWord && activeEditableElement) { 
+                        console.log('[Editable Blur] Condition met, calling commitWordEdit.');
+                        commitWordEdit();
+                    } else {
+                        console.log('[Editable Blur] Condition NOT met, not calling commitWordEdit.');
+                    }
+                }, 0);
+            });
+            
+            // Replace the static span with the editable one
+            wordSpanToReplace.replaceWith(activeEditableElement);
+            
+            // Focus and select text content
+            activeEditableElement.focus();
+            const range = document.createRange();
+            range.selectNodeContents(activeEditableElement);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+
+            console.log(`[initiateWordEdit] Contenteditable span created for word: "${wordToEdit}"`);
+        }
+
+        function commitWordEdit() {
+            console.log(`[commitWordEdit] Start. isEditingWord: ${isEditingWord}. Selected: ${selectedWordIndex}. Text: ${activeEditableElement ? activeEditableElement.textContent : 'N/A'}`);
+            if (!isEditingWord || !activeEditableElement) return;
+
+            const newWord = activeEditableElement.textContent.trim(); // Use textContent for contenteditable
+            const originalIndexOfEditedWord = selectedWordIndex;
+
+            if (newWord) {
+                correctedWords[selectedWordIndex] = newWord;
+            } else {
+                correctedWords.splice(selectedWordIndex, 1);
+                if (selectedWordIndex >= correctedWords.length && correctedWords.length > 0) {
+                    selectedWordIndex = correctedWords.length - 1;
+                } else if (correctedWords.length === 0) {
+                    selectedWordIndex = -1;
+                }
+            }
+
+            isEditingWord = false;
+            activeEditableElement = null; 
+            console.log(`[commitWordEdit] isEditingWord set to: ${isEditingWord}`);
+
+            renderCorrectionArea(); 
+
+            if (correctedWords.length === 0) {
+                selectedWordIndex = -1; 
+            } else {
+                if (newWord) { 
+                    if (originalIndexOfEditedWord + 1 < correctedWords.length) {
+                        selectedWordIndex = originalIndexOfEditedWord + 1; 
+                    } else {
+                        selectedWordIndex = originalIndexOfEditedWord; 
+                         if (selectedWordIndex >= correctedWords.length) selectedWordIndex = correctedWords.length -1; 
+                    }
+                }
+                selectWord(selectedWordIndex);
+            }
+            
+            correctionAreaEl.focus(); 
+            console.log('[commitWordEdit] End.');
+        }
+
+
+        function cancelWordEdit() {
+            console.log(`[cancelWordEdit] Start. isEditingWord: ${isEditingWord}. Selected: ${selectedWordIndex}`);
+            if (!isEditingWord) return;
+            isEditingWord = false;
+            activeEditableElement = null;
+            console.log(`[cancelWordEdit] isEditingWord set to: ${isEditingWord}`);
+
+            renderCorrectionArea(); 
+            if(selectedWordIndex !== -1 && correctedWords.length > 0) {
+                selectWord(selectedWordIndex);
+            } else if (correctedWords.length === 0) {
+                selectedWordIndex = -1;
+            }
+            correctionAreaEl.focus();
+            console.log('[cancelWordEdit] End.');
+        }
+
+        function deleteSelectedWord() {
+            if (isEditingWord || selectedWordIndex < 0 || selectedWordIndex >= correctedWords.length) return;
+            correctedWords.splice(selectedWordIndex, 1);
+            if (correctedWords.length === 0) selectedWordIndex = -1;
+            else if (selectedWordIndex >= correctedWords.length) selectedWordIndex = correctedWords.length - 1;
+            renderCorrectionArea();
+            if (selectedWordIndex !== -1) selectWord(selectedWordIndex);
+            else correctionAreaEl.focus(); 
+        }
+
+        function loadSentence(index) {
+            if (index >= sentencePairs.length) {
+                allCompleted = true;
+                document.removeEventListener('keydown', globalKeyHandler);
+                helpToggleBtn.classList.add('hidden');
+                if (isHelpModalOpen) hideHelpModal(true); 
+                appContainer.innerHTML = `<div class="text-center p-10">
+                    <h2 class="text-3xl font-bold text-green-600">Completed!</h2>
+                    <p class="text-gray-700 mt-4">All sentences have been processed.</p>
+                </div>`;
+                return;
+            }
+            const pair = sentencePairs[index];
+            sourceSentenceEl.textContent = pair.source;
+            llmTargetSentenceEl.textContent = pair.target;
+            originalTargetForReset = pair.target;
+            correctedWords = normalizeWords(pair.target);
+            selectedWordIndex = correctedWords.length > 0 ? 0 : -1; 
+            isEditingWord = false; 
+            renderCorrectionArea();
+            if (selectedWordIndex !== -1) selectWord(selectedWordIndex);
+            statusTextEl.textContent = `Sentence ${index + 1} of ${sentencePairs.length}`;
+            correctionAreaEl.focus(); 
+        }
+
+        function handleSubmit() {
+            if (allCompleted || isEditingWord) return;
+            const currentData = {
+                originalSource: sentencePairs[currentSentenceIndex].source,
+                originalTarget: sentencePairs[currentSentenceIndex].target,
+                correctedTarget: correctedWords.join(' ')
+            };
+            console.log("Submitted Data:", JSON.stringify(currentData)); 
+            currentSentenceIndex++;
+            loadSentence(currentSentenceIndex);
+        }
+
+        function handleReset() {
+            if (allCompleted || isEditingWord) return; 
+            correctedWords = normalizeWords(originalTargetForReset);
+            selectedWordIndex = correctedWords.length > 0 ? 0 : -1;
+            isEditingWord = false; 
+            renderCorrectionArea();
+            if (selectedWordIndex !== -1) selectWord(selectedWordIndex);
+            correctionAreaEl.focus();
+        }
+        
+        function showHelpModal() {
+            if (allCompleted) return;
+            elementThatHadFocusBeforeModal = document.activeElement;
+            helpModal.classList.remove('hidden'); helpModal.classList.add('flex'); 
+            isHelpModalOpen = true; closeHelpModalBtn.focus();
+        }
+        function hideHelpModal(force = false) {
+            if (!isHelpModalOpen && !force) return;
+            helpModal.classList.add('hidden'); helpModal.classList.remove('flex');
+            isHelpModalOpen = false;
+            if (elementThatHadFocusBeforeModal && typeof elementThatHadFocusBeforeModal.focus === 'function') {
+                elementThatHadFocusBeforeModal.focus();
+            } else { correctionAreaEl.focus(); }
+        }
+        function toggleHelpModal() { isHelpModalOpen ? hideHelpModal() : showHelpModal(); }
+
+        function globalKeyHandler(e) {
+            if (allCompleted) return;
+            if (isHelpModalOpen) {
+                if (e.key === 'Escape' || e.key === 'F1' || e.key === '?') { e.preventDefault(); hideHelpModal(); }
+                return; 
+            }
+            if (!isEditingWord && (e.key === 'F1' || e.key === '?')) { e.preventDefault(); showHelpModal(); return; }
+            if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); handleSubmit(); return; }
+            
+            // If focus is on a standard input/textarea elsewhere (not our contenteditable)
+            if (document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName) && !document.activeElement.isContentEditable) {
+                return; 
+            }
+
+            if (isEditingWord) { 
+                // Keydown on contenteditable is handled by its own listener due to stopPropagation
+                return;
+            }
+
+            switch (e.key) {
+                case 'ArrowLeft': e.preventDefault(); moveSelection(-1); break;
+                case 'ArrowRight': e.preventDefault(); moveSelection(1); break;
+                case 'Enter': case 'F2':
+                    if (selectedWordIndex !== -1) { e.preventDefault(); initiateWordEdit(); } break;
+                case 'Delete': case 'Backspace': 
+                     if (selectedWordIndex !== -1) { e.preventDefault(); deleteSelectedWord(); } break;
+                case 'Escape': e.preventDefault(); handleReset(); break;
+            }
+        }
+
+        submitBtn.addEventListener('click', handleSubmit);
+        resetBtn.addEventListener('click', handleReset);
+        helpToggleBtn.addEventListener('click', toggleHelpModal);
+        closeHelpModalBtn.addEventListener('click', hideHelpModal);
+        document.addEventListener('keydown', globalKeyHandler);
+        
+        window.addEventListener('keydown', function(e) {
+            if (e.key === 'F1') e.preventDefault();
+            if (e.key === 'F2' && !isEditingWord && selectedWordIndex !== -1 && !isHelpModalOpen) e.preventDefault();
+        });
+
+        loadSentence(currentSentenceIndex);
+    </script>
+
+</body>
+</html>
