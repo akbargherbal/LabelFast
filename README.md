@@ -1,0 +1,2 @@
+# LabelFast
+Label things fast.
