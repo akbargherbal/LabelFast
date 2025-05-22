@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Text Annotation Tool v003 (Alpine.js - Debug)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"
+      defer
+    ></script>
+    <style>
+      .editable-word {
+        outline: none;
+        min-width: 60px; /* Ensure editable area is clickable */
+        display: inline-block;
+        vertical-align: baseline;
+      }
+      kbd {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+          "Liberation Mono", "Courier New", monospace;
+        padding: 0.25rem 0.5rem;
+        background-color: #e5e7eb; /* gray-200 */
+        border-radius: 0.25rem;
+        border: 1px solid #d1d5db; /* gray-300 */
+        box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
+        color: #374151; /* gray-700 */
+        font-size: 0.875em;
+      }
+      [x-cloak] { display: none !important; }
+    </style>
+  </head>
+  <body
+    class="min-h-screen bg-gray-100 flex flex-col items-center justify-center p-4 font-sans"
+    x-data="app()"
+    @keydown.window="globalKeyHandler($event)"
+    x-init="init()"
+    x-cloak
+  >
+    <div x-show="!allCompleted"
+      id="appContainer"
+      class="bg-white shadow-xl rounded-lg p-6 md:p-8 w-full max-w-3xl"
+    >
+      <h1 class="text-2xl font-bold text-center text-gray-700 mb-6">
+        Sentence Correction (v003 Alpine.js - Debug)
+      </h1>
+
+      <div>
+        <p class="text-sm font-semibold text-gray-700 mb-1">Source (المصدر)</p>
+        <div
+          id="sourceSentence"
+          x-text="sourceSentence"
+          dir="rtl"
+          class="mb-4 p-3 bg-slate-200 rounded text-slate-800 text-lg min-h-[40px]"
+        ></div>
+      </div>
+
+      <div>
+        <p class="text-sm font-semibold text-gray-700 mb-1">
+          LLM Output (ترجمة الآلة)
+        </p>
+        <div
+          id="llmTargetSentence"
+          x-text="llmTargetSentence"
+          dir="rtl"
+          class="mb-4 p-3 bg-amber-100 rounded text-amber-800 text-lg min-h-[40px]"
+        ></div>
+      </div>
+
+      <div>
+        <p class="text-sm font-semibold text-gray-700 mb-1">
+          Your Correction (التصحيح)
+        </p>
+        <div
+          id="correctionArea"
+          x-ref="correctionArea"
+          dir="rtl"
+          class="mb-6 p-3 border-2 border-blue-500 rounded text-lg min-h-[70px] flex flex-wrap gap-x-2 gap-y-1 items-center focus:outline-none"
+          tabindex="0"
+        >
+          <span x-show="correctedWords.length === 0 && !isEditingWord" class="text-gray-400 italic">
+            Sentence is empty.
+          </span>
+          <template x-for="(word, index) in correctedWords" :key="index + '-' + word"> <!-- Slightly more robust key -->
+            <div class="contents">
+              <span
+                x-show="!(isEditingWord && selectedWordIndex === index)"
+                x-text="word"
+                :data-index="index"
+                @click="if(!isEditingWord) selectWord(index)"
+                @dblclick="if(!isEditingWord) { selectWord(index); initiateWordEdit(); }"
+                :class="{
+                  'p-1 rounded cursor-pointer transition-colors duration-150 ease-in-out inline-block': true,
+                  'bg-sky-600 text-white': selectedWordIndex === index && !isEditingWord,
+                  'hover:bg-sky-100': !(selectedWordIndex === index && !isEditingWord)
+                }"
+              ></span>
+              <span
+                x-show="isEditingWord && selectedWordIndex === index"
+                :ref="'editableWord_' + index" 
+                contenteditable="true"
+                x-text="word" 
+                :data-editable-index="index"
+                class="editable-word p-1 border border-blue-700 rounded shadow-sm focus:ring-2 focus:ring-blue-500 text-lg bg-white"
+                @keydown.enter.prevent.stop="console.log('Editable Enter:', $event.target.textContent); commitWordEdit($event.target.textContent)"
+                @keydown.escape.prevent.stop="console.log('Editable Escape'); cancelWordEdit()"
+                @blur="handleEditableBlur($event)"
+                dir="rtl"
+              ></span>
+            </div>
+          </template>
+          <span class="w-0 h-0 p-0 m-0"></span>
+        </div>
+      </div>
+
+      <div class="flex flex-col sm:flex-row justify-end gap-2">
+        <button @click="handleReset()" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded">
+          Reset Current (Esc)
+        </button>
+        <button @click="handleSubmit()" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded">
+          Submit & Next (Ctrl+Enter)
+        </button>
+      </div>
+      <div x-text="statusText" class="text-sm text-gray-600 mt-6 text-center"></div>
+    </div>
+
+    <div x-show="allCompleted" class="text-center p-10 bg-white shadow-xl rounded-lg">
+        <h2 class="text-3xl font-bold text-green-600">Completed!</h2>
+        <p class="text-gray-700 mt-4">All sentences have been processed.</p>
+    </div>
+
+    <button x-show="!allCompleted" @click="toggleHelpModal()" title="Help (? or F1)" class="fixed bottom-4 right-4 bg-sky-500 hover:bg-sky-600 text-white font-bold p-2 rounded-full shadow-lg w-10 h-10 flex items-center justify-center text-xl z-40">?</button>
+
+    <div x-show="isHelpModalOpen" @click.self="hideHelpModal()" x-transition class="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center p-4 z-50">
+      <div class="bg-white p-6 md:p-8 rounded-lg shadow-xl max-w-xl w-full" x-transition>
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-xl font-bold text-gray-800">Help & Shortcuts</h2>
+          <button x-ref="closeHelpModalBtn" @click="hideHelpModal()" class="text-gray-500 hover:text-gray-700 text-3xl leading-none">&times;</button>
+        </div>
+        {/* ... Help content ... */}
+        <div class="text-gray-700 space-y-3 text-sm sm:text-base">
+          <p><strong>Word Navigation & Selection (in "Your Correction" area):</strong></p>
+          <ul class="list-disc list-inside ml-4 space-y-1">
+            <li><kbd>Space</kbd>: Next word (when not editing).</li>
+            <li><kbd>Shift</kbd> + <kbd>Space</kbd>: Previous word (when not editing).</li>
+            <li><kbd>←</kbd> / <kbd>→</kbd>: Select previous/next word.</li>
+            <li>Click on a word: Selects it.</li>
+          </ul>
+          <p><strong>Word Correction:</strong></p>
+          <ul class="list-disc list-inside ml-4 space-y-1">
+            <li><kbd>Enter</kbd> / <kbd>F2</kbd> / Double-click (on selected word): Start editing the word.</li>
+            <li>While editing:
+              <ul class="list-['◦'] list-inside ml-6 space-y-1">
+                <li>Type your correction. <kbd>Space</kbd> inserts a space.</li>
+                <li><kbd>Enter</kbd>: Confirm word change (moves to next word if not last).</li>
+                <li><kbd>Esc</kbd>: Cancel word change and revert to original.</li>
+              </ul>
+            </li>
+            <li><kbd>Delete</kbd> / <kbd>Backspace</kbd> (on selected word): Delete the word.</li>
+          </ul>
+          <p><strong>Sentence Actions:</strong></p>
+          <ul class="list-disc list-inside ml-4 space-y-1">
+            <li><kbd>Ctrl</kbd> + <kbd>Enter</kbd>: Submit current correction and load next sentence.</li>
+            <li><kbd>Esc</kbd> (when not editing a word and help is closed): Reset current sentence to LLM's original translation.</li>
+          </ul>
+          <p><strong>Help Dialog:</strong></p>
+          <ul class="list-disc list-inside ml-4 space-y-1">
+            <li>Click the <span class="inline-flex items-center justify-center bg-sky-500 text-white font-bold w-5 h-5 rounded-full text-xs">?</span> button: Show/hide this help.</li>
+            <li><kbd>?</kbd> (Shift + /) or <kbd>F1</kbd>: Show/hide this help.</li>
+            <li><kbd>Esc</kbd> (when help is open): Close this help.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <script>
+    function app() {
+      return {
+        sentencePairs: [ /* ... same data ... */
+          { source: "لماذا فعلت هذا الشيء يا رجل", target: "ليش عملت هذا الشيء يا رجال" },
+          { source: "أين كنت عندما حدث ذلك؟", target: "وينك يوم صار هالشي؟" },
+          { source: "هذا الطعام لذيذ جدا.", target: "هالأكل وايد حلو." },
+          { source: "هل يمكنك مساعدتي من فضلك؟", target: "تقدر تساعدني لو سمحت؟" },
+          { source: "سأراك لاحقاً.", target: "أشوفك بعدين." },
+          { source: "ما هو اسمك؟", target: "شنو اسمك؟" },
+          { source: "أنا بخير، شكراً لك.", target: "أنا زين، مشكور." },
+        ],
+        currentSentenceIndex: 0,
+        sourceSentence: "",
+        llmTargetSentence: "",
+        correctedWords: [],
+        selectedWordIndex: -1,
+        isEditingWord: false,
+        wordBeingEditedOriginalValue: "", // Store original value of word being edited
+        originalTargetForReset: "",
+        allCompleted: false,
+        isHelpModalOpen: false,
+        elementThatHadFocusBeforeModal: null,
+        statusText: "",
+
+        init() {
+          console.log("App init: Loading first sentence");
+          this.loadSentence(this.currentSentenceIndex);
+          // Add specific F1/F2 prevent default that was outside alpine component
+          window.addEventListener('keydown', e => {
+            if (e.key === 'F1') e.preventDefault();
+            if (e.key === 'F2' && !this.isEditingWord && this.selectedWordIndex !== -1 && !this.isHelpModalOpen) e.preventDefault();
+          });
+        },
+
+        normalizeWords(sentence) {
+          return sentence.split(/\s+/).filter((word) => word.length > 0);
+        },
+
+        selectWord(index) {
+          console.log(`selectWord(${index}), current isEditingWord: ${this.isEditingWord}, current selectedWordIndex: ${this.selectedWordIndex}`);
+          if (this.isEditingWord) {
+            console.log("selectWord: Aborting because isEditingWord is true.");
+            return;
+          }
+
+          if (this.correctedWords.length === 0) {
+            this.selectedWordIndex = -1;
+          } else if (index >= 0 && index < this.correctedWords.length) {
+            this.selectedWordIndex = index;
+          } else if (index < 0 && this.correctedWords.length > 0) { // Wrap from start to end
+            this.selectedWordIndex = this.correctedWords.length - 1;
+          } else if (index >= this.correctedWords.length && this.correctedWords.length > 0) { // Wrap from end to start
+            this.selectedWordIndex = 0;
+          } else {
+            this.selectedWordIndex = -1;
+          }
+          console.log("selectWord: new selectedWordIndex:", this.selectedWordIndex);
+
+          this.$nextTick(() => {
+            const selectedSpan = this.$refs.correctionArea?.querySelector(`span[data-index='${this.selectedWordIndex}']`);
+            if (selectedSpan) {
+              console.log("selectWord: Scrolling to", selectedSpan);
+              selectedSpan.scrollIntoView({ behavior: "auto", block: "nearest", inline: "nearest" });
+            } else if (this.selectedWordIndex !== -1) {
+              console.warn("selectWord: Could not find span to scroll to for index", this.selectedWordIndex);
+            }
+          });
+        },
+
+        moveSelection(direction) {
+          console.log(`moveSelection(${direction}), isEditingWord: ${this.isEditingWord}, correctedWords.length: ${this.correctedWords.length}, current selectedIdx: ${this.selectedWordIndex}`);
+          if (this.isEditingWord || this.correctedWords.length === 0) return;
+          let newIndex = this.selectedWordIndex + direction;
+          // selectWord handles wrapping logic now
+          this.selectWord(newIndex);
+        },
+
+        initiateWordEdit() {
+          console.log(`initiateWordEdit, selectedWordIndex: ${this.selectedWordIndex}, current isEditingWord: ${this.isEditingWord}`);
+          if (this.isEditingWord || this.selectedWordIndex < 0 || this.selectedWordIndex >= this.correctedWords.length) {
+            console.log("initiateWordEdit: Aborting due to guards.");
+            return;
+          }
+
+          this.isEditingWord = true;
+          this.wordBeingEditedOriginalValue = this.correctedWords[this.selectedWordIndex];
+          console.log("initiateWordEdit: Set isEditingWord=true, originalValue:", this.wordBeingEditedOriginalValue);
+
+          this.$nextTick(() => {
+            let editableEl = this.$refs['editableWord_' + this.selectedWordIndex];
+            if (!editableEl) { // Fallback if $refs not immediately available
+                editableEl = this.$el.querySelector(`span[data-editable-index='${this.selectedWordIndex}']`);
+                console.warn(`initiateWordEdit ($nextTick): Used querySelector fallback for editableEl for index ${this.selectedWordIndex}`);
+            }
+            console.log(`initiateWordEdit ($nextTick): editableEl for index ${this.selectedWordIndex}:`, editableEl);
+            
+            if (editableEl) {
+              // Alpine updates x-text before this sometimes, so ensure original value is set if needed
+              if (editableEl.textContent !== this.wordBeingEditedOriginalValue) {
+                  console.log("initiateWordEdit ($nextTick): Mismatch, setting textContent of editable to original:", this.wordBeingEditedOriginalValue)
+                  editableEl.textContent = this.wordBeingEditedOriginalValue;
+              }
+              editableEl.focus();
+              const selection = window.getSelection();
+              const range = document.createRange();
+              try {
+                  range.selectNodeContents(editableEl);
+                  selection.removeAllRanges();
+                  selection.addRange(range);
+                  console.log("initiateWordEdit ($nextTick): Focused and selected content of", editableEl);
+              } catch(e){
+                  console.error("initiateWordEdit ($nextTick): Error selecting content", e);
+              }
+            } else {
+              console.error('initiateWordEdit ($nextTick): Could not find editable span for index', this.selectedWordIndex, "- Aborting edit.");
+              this.isEditingWord = false; 
+            }
+          });
+        },
+        
+        _forceCommitCurrentEdit() {
+            console.log("_forceCommitCurrentEdit called. isEditingWord:", this.isEditingWord, "selectedWordIndex:", this.selectedWordIndex);
+            if (this.isEditingWord && this.selectedWordIndex !== -1) {
+                let editableEl = this.$refs['editableWord_' + this.selectedWordIndex] || this.$el.querySelector(`span[data-editable-index='${this.selectedWordIndex}']`);
+                if (editableEl) {
+                    console.log("_forceCommitCurrentEdit: Found editable element, committing text:", editableEl.textContent);
+                    this.commitWordEdit(editableEl.textContent); 
+                    return true; 
+                } else {
+                    console.warn("_forceCommitCurrentEdit: isEditingWord is true, but no editable element found. Resetting isEditingWord.");
+                    this.isEditingWord = false; 
+                    return false; 
+                }
+            }
+            console.log("_forceCommitCurrentEdit: Not editing or invalid index, nothing to commit.");
+            return false;
+        },
+
+        commitWordEdit(newWordText) {
+          console.log(`commitWordEdit, newWordText: "${newWordText}", current isEditingWord: ${this.isEditingWord}, current selectedWordIndex: ${this.selectedWordIndex}`);
+          if (!this.isEditingWord || this.selectedWordIndex === -1) { // Guard against invalid state
+            console.log("commitWordEdit: Aborting because isEditingWord is false or selectedWordIndex is -1.");
+            // If somehow stuck in isEditingWord=true with no selected index, reset it.
+            if (this.isEditingWord && this.selectedWordIndex === -1) this.isEditingWord = false;
+            return;
+          }
+
+          const newWord = newWordText.trim();
+          const originalIndexOfEditedWord = this.selectedWordIndex;
+          let nextSelectionIndex = this.selectedWordIndex;
+
+          if (newWord) {
+            this.correctedWords[this.selectedWordIndex] = newWord;
+            console.log(`commitWordEdit: Word at index ${this.selectedWordIndex} updated to "${newWord}"`);
+            if (originalIndexOfEditedWord + 1 < this.correctedWords.length) {
+              nextSelectionIndex = originalIndexOfEditedWord + 1;
+            } else { // It was the last word, or became the last word
+              nextSelectionIndex = originalIndexOfEditedWord; 
+              if (nextSelectionIndex >= this.correctedWords.length) { // Should not happen if word was updated
+                nextSelectionIndex = this.correctedWords.length -1;
+              }
+            }
+          } else { // Word deleted
+            this.correctedWords.splice(this.selectedWordIndex, 1);
+            console.log(`commitWordEdit: Word at index ${this.selectedWordIndex} deleted. New correctedWords count: ${this.correctedWords.length}`);
+            if (this.correctedWords.length === 0) {
+              nextSelectionIndex = -1;
+            } else if (originalIndexOfEditedWord >= this.correctedWords.length) { 
+              nextSelectionIndex = this.correctedWords.length - 1;
+            } else { 
+              nextSelectionIndex = originalIndexOfEditedWord; // Select the word that took its place
+            }
+          }
+          
+          this.isEditingWord = false;
+          console.log("commitWordEdit: Set isEditingWord=false. Original index was:", originalIndexOfEditedWord, "Next selection index will be:", nextSelectionIndex);
+          this.selectedWordIndex = nextSelectionIndex;
+          
+          if (this.selectedWordIndex !== -1) {
+              this.selectWord(this.selectedWordIndex); // This re-selects and ensures the view is updated
+          } else {
+            // If all words deleted, selectedWordIndex is -1, selectWord handles this.
+            this.selectWord(-1); // To clear any visual selection artifacts.
+          }
+          
+          console.log("commitWordEdit: Focusing correctionArea");
+          this.$refs.correctionArea?.focus();
+        },
+
+        handleEditableBlur(event) {
+            console.log("handleEditableBlur: Fired for target:", event.target, "current isEditingWord:", this.isEditingWord, "current selectedWordIndex:", this.selectedWordIndex);
+            const blurredElementIndex = parseInt(event.target.dataset.editableIndex);
+
+            setTimeout(() => {
+                console.log("handleEditableBlur (setTimeout): isEditingWord:", this.isEditingWord, "selectedWordIndex (at timeout):", this.selectedWordIndex, "blurredElementIndex:", blurredElementIndex);
+                // Only commit if still editing THE SAME word that triggered the blur
+                if (this.isEditingWord && this.selectedWordIndex === blurredElementIndex && this.selectedWordIndex !== -1) {
+                    console.log("handleEditableBlur (setTimeout): Committing word from blur:", event.target.textContent);
+                    this.commitWordEdit(event.target.textContent);
+                } else {
+                    console.log("handleEditableBlur (setTimeout): Conditions not met for commit on blur.");
+                }
+            }, 150); // Increased delay slightly
+        },
+
+        cancelWordEdit() {
+          console.log(`cancelWordEdit, current isEditingWord: ${this.isEditingWord}, current selectedWordIndex: ${this.selectedWordIndex}`);
+          if (!this.isEditingWord || this.selectedWordIndex === -1) return;
+          
+          this.correctedWords[this.selectedWordIndex] = this.wordBeingEditedOriginalValue;
+          console.log("cancelWordEdit: Reverted word at index", this.selectedWordIndex, "to", this.wordBeingEditedOriginalValue);
+          this.isEditingWord = false;
+          console.log("cancelWordEdit: Set isEditingWord=false. Re-selecting word.");
+          this.selectWord(this.selectedWordIndex); // Re-select to update view
+          this.$refs.correctionArea?.focus();
+        },
+
+        deleteSelectedWord() {
+          console.log(`deleteSelectedWord, selectedWordIndex: ${this.selectedWordIndex}, isEditingWord: ${this.isEditingWord}`);
+          if (this.isEditingWord || this.selectedWordIndex < 0 || this.selectedWordIndex >= this.correctedWords.length) return;
+          
+          const originalIndex = this.selectedWordIndex;
+          this.correctedWords.splice(originalIndex, 1);
+          console.log("deleteSelectedWord: New correctedWords:", JSON.stringify(this.correctedWords));
+          
+          if (this.correctedWords.length === 0) {
+            this.selectedWordIndex = -1;
+          } else if (originalIndex >= this.correctedWords.length) { // If last word was deleted
+            this.selectedWordIndex = this.correctedWords.length - 1; 
+          } else {
+            // Word from middle/start deleted, selectedWordIndex remains same, pointing to the new word at that position
+            this.selectedWordIndex = originalIndex;
+          }
+          console.log("deleteSelectedWord: New selectedWordIndex:", this.selectedWordIndex);
+          
+          this.selectWord(this.selectedWordIndex); // Re-select and scroll/update view
+          if(this.correctedWords.length === 0) this.$refs.correctionArea?.focus(); // if no word selected, focus area
+        },
+
+        loadSentence(index) {
+          console.log(`loadSentence(${index})`);
+          if (index >= this.sentencePairs.length) {
+            this.allCompleted = true;
+            console.log("loadSentence: All completed!");
+            if (this.isHelpModalOpen) this.hideHelpModal(true);
+            return;
+          }
+          this.allCompleted = false;
+          const pair = this.sentencePairs[index];
+          this.sourceSentence = pair.source;
+          this.llmTargetSentence = pair.target;
+          this.originalTargetForReset = pair.target;
+          this.correctedWords = this.normalizeWords(pair.target);
+          console.log("loadSentence: Loaded words:", JSON.stringify(this.correctedWords));
+          this.selectedWordIndex = this.correctedWords.length > 0 ? 0 : -1;
+          this.isEditingWord = false;
+
+          this.$nextTick(() => {
+              this.statusText = `Sentence ${index + 1} of ${this.sentencePairs.length}`;
+              if (this.selectedWordIndex !== -1) {
+                this.selectWord(this.selectedWordIndex);
+              }
+              this.$refs.correctionArea?.focus();
+              console.log("loadSentence ($nextTick): Focused correctionArea. selectedWordIndex:", this.selectedWordIndex);
+          });
+        },
+
+        handleSubmit() {
+          console.log("handleSubmit: Called. allCompleted:", this.allCompleted);
+          if (this.allCompleted) return;
+          console.log("handleSubmit: Forcing commit edit.");
+          this._forceCommitCurrentEdit(); 
+          if (this.isEditingWord) { // Check if force commit succeeded
+            console.log("handleSubmit: Aborting because isEditingWord is still true after forceCommit.");
+            return;
+          }
+          // ... (rest of handleSubmit logic from original) ...
+          const currentData = { /* ... */ };
+          console.log("Submitted Data:", JSON.stringify(currentData, null, 2));
+          this.currentSentenceIndex++;
+          this.loadSentence(this.currentSentenceIndex);
+          console.log("handleSubmit: Processed. Loading next sentence.");
+        },
+
+        handleReset() {
+          console.log("handleReset: Called. allCompleted:", this.allCompleted);
+          if (this.allCompleted) return;
+          console.log("handleReset: Forcing commit edit.");
+          this._forceCommitCurrentEdit(); 
+          if (this.isEditingWord) { // Check if force commit succeeded
+            console.log("handleReset: Aborting because isEditingWord is still true after forceCommit.");
+            return;
+          }
+          // ... (rest of handleReset logic from original) ...
+          this.correctedWords = this.normalizeWords(this.originalTargetForReset);
+          this.selectedWordIndex = this.correctedWords.length > 0 ? 0 : -1;
+          this.isEditingWord = false;
+          this.$nextTick(() => {
+             if (this.selectedWordIndex !== -1) this.selectWord(this.selectedWordIndex);
+             this.$refs.correctionArea?.focus();
+          });
+          console.log("handleReset: Processed. Sentence reset.");
+        },
+
+        showHelpModal() { /* ... logging can be added if needed ... */ this.elementThatHadFocusBeforeModal = document.activeElement; this.isHelpModalOpen = true; this.$nextTick(() => this.$refs.closeHelpModalBtn?.focus()); },
+        hideHelpModal(force = false) { /* ... */ if (!this.isHelpModalOpen && !force) return; this.isHelpModalOpen = false; if (this.elementThatHadFocusBeforeModal && typeof this.elementThatHadFocusBeforeModal.focus === 'function') { this.elementThatHadFocusBeforeModal.focus(); } else if (this.$refs.correctionArea) { this.$refs.correctionArea.focus(); } },
+        toggleHelpModal() { this.isHelpModalOpen ? this.hideHelpModal() : this.showHelpModal(); },
+
+        globalKeyHandler(e) {
+          // Basic log for all keys can be noisy, enable if specific key is misbehaving.
+          // console.log(`globalKeyHandler: Key='${e.key}', Ctrl=${e.ctrlKey}, Shift=${e.shiftKey}, Alt=${e.altKey}, isEditingWord=${this.isEditingWord}, isHelpModalOpen=${this.isHelpModalOpen}, activeElement:`, document.activeElement);
+
+          if (this.allCompleted) return;
+
+          if (this.isHelpModalOpen) {
+            if (e.key === "Escape" || e.key === "F1" || (e.key === "?" && e.shiftKey)) {
+              console.log("globalKeyHandler: Closing help modal via key.");
+              e.preventDefault(); this.hideHelpModal();
+            }
+            return;
+          }
+
+          if (!this.isEditingWord && (e.key === "F1" || (e.key === "?" && e.shiftKey))) {
+            console.log("globalKeyHandler: Opening help modal via key.");
+            e.preventDefault(); this.showHelpModal(); return;
+          }
+          
+          if (e.ctrlKey && e.key === "Enter") {
+            console.log("globalKeyHandler: Ctrl+Enter detected for submit.");
+            e.preventDefault(); this.handleSubmit(); return;
+          }
+
+          const activeEditableSpan = (this.isEditingWord && this.selectedWordIndex !== -1) 
+            ? (this.$refs['editableWord_' + this.selectedWordIndex] || this.$el.querySelector(`span[data-editable-index='${this.selectedWordIndex}']`))
+            : null;
+          
+          if (this.isEditingWord && document.activeElement === activeEditableSpan) {
+            // console.log("globalKeyHandler: Event handling deferred to contenteditable span's own @keydown listeners or default behavior.");
+            // Enter, Escape are handled by @keydown on the span. Space is default behavior.
+            return; 
+          }
+          
+          const activeTag = document.activeElement ? document.activeElement.tagName : null;
+          const activeIsContentEditable = document.activeElement ? document.activeElement.isContentEditable : false;
+
+          if (e.key === " " && (activeTag === "BUTTON" || (activeTag === "INPUT" || activeTag === "TEXTAREA") || (activeIsContentEditable && document.activeElement !== activeEditableSpan))) {
+            // console.log("globalKeyHandler: Spacebar default action for focused element:", document.activeElement);
+            return; 
+          }
+
+          // General shortcuts for when not focused on the contenteditable input or when keys are not for editing.
+          switch (e.key) {
+            case " ":
+              if(!this.isEditingWord) {
+                console.log("globalKeyHandler: Spacebar for navigation (Shift:", e.shiftKey, ")");
+                e.preventDefault(); 
+                if (e.shiftKey) this.moveSelection(-1); else this.moveSelection(1);
+              }
+              break;
+            case "ArrowLeft":
+              if (!this.isEditingWord) { console.log("globalKeyHandler: ArrowLeft."); e.preventDefault(); this.moveSelection(-1); }
+              break;
+            case "ArrowRight":
+              if (!this.isEditingWord) { console.log("globalKeyHandler: ArrowRight."); e.preventDefault(); this.moveSelection(1); }
+              break;
+            case "Enter": case "F2":
+              if (!this.isEditingWord && this.selectedWordIndex !== -1) {
+                console.log(`globalKeyHandler: ${e.key} to initiate edit.`);
+                e.preventDefault(); this.initiateWordEdit();
+              }
+              break;
+            case "Delete": case "Backspace":
+              if (!this.isEditingWord && this.selectedWordIndex !== -1) {
+                console.log(`globalKeyHandler: ${e.key} to delete word.`);
+                e.preventDefault(); this.deleteSelectedWord();
+              }
+              break;
+            case "Escape":
+              if (!this.isEditingWord && !this.isHelpModalOpen) { // Word cancel (handled by editable) & help close (handled above)
+                console.log("globalKeyHandler: Escape to reset sentence.");
+                e.preventDefault(); this.handleReset();
+              }
+              break;
+          }
+        }
+      };
+    }
+    </script>
+  </body>
+</html>

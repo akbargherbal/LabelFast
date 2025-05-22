@@ -1,100 +1,124 @@
-# LabelFast (Proof of Concept)
+# LabelFast (Proof of Concept v003)
 
 [![Status: Proof of Concept](https://img.shields.io/badge/status-proof_of_concept-lightgrey)](https://shields.io/)
+[![Tech: Vanilla JS](https://img.shields.io/badge/tech-Vanilla_JS-yellow)](https://shields.io/)
+[![Styling: Tailwind CSS](https://img.shields.io/badge/styling-Tailwind_CSS-38B2AC)](https://shields.io/)
 
-LabelFast is a single-page web application designed for efficient, low-friction labeling and correction of text. It's particularly aimed at reviewing and correcting machine-generated translations (e.g., from LLMs) sentence by sentence, with a focus on tasks requiring domain expertise, such as translating to rare languages or specific dialects.
+LabelFast is a proof-of-concept, single-HTML-file web application designed for **efficient, low-friction labeling and correction of text**. It's specifically aimed at domain experts reviewing and correcting machine-generated translations (e.g., from LLMs) sentence by sentence, with a strong emphasis on tasks requiring nuanced understanding, such as translating to rare languages or specific dialects (e.g., Modern Standard Arabic to Kuwaiti dialect).
 
-The core philosophy is to **minimize context switching** and empower the annotator with a **keyboard-centric workflow** for maximum speed and comfort.
+## Core Philosophy & Unnegotiable Features
 
-## The Problem
+The fundamental principle of LabelFast is to **drastically reduce friction and minimize context switching** for the expert annotator. This is achieved through:
 
-Reviewing and correcting Large Language Model (LLM) outputs, especially for nuanced tasks like dialectal translation (e.g., Arabic to Kuwaiti dialect), can be a tedious and time-consuming process. Traditional text editors or generic annotation tools might introduce unnecessary friction. This project aims to provide a streamlined interface tailored for this specific correction task.
+1.  **Keyboard-Centric Supremacy:** The primary mode of interaction is designed around the keyboard for maximum speed. Mouse support is secondary but available.
+    - **Unnegotiable:** Core navigation and editing actions must have intuitive, fast keyboard shortcuts.
+2.  **Instantaneous Feedback:** All changes and selections must reflect immediately in the UI without perceptible delay.
+    - **Unnegotiable:** No page reloads for common actions. UI updates are live.
+3.  **Minimal Cognitive Load:** The interface must be clean, uncluttered, and present only the necessary information for the current task (source, LLM target reference, and correction area).
+    - **Unnegotiable:** Avoid visual distractions and unnecessary clicks/keystrokes.
+4.  **Focused Workflow:** One sentence pair (source/target) at a time, allowing the expert to concentrate fully on the immediate correction task.
+5.  **Direct Manipulation:** Editing words should feel as close to typing directly into the sentence as possible.
 
-## Key Features (Proof of Concept)
+## The Problem Being Solved
 
-- **Single-Page Application:** All interactions happen on one page without reloads.
-- **Sentence-by-Sentence Workflow:** Presents one source/target pair at a time.
-- **Clear Visual Separation:**
-  - Displays the original **Source Text**.
-  - Displays the initial **LLM Target Text** (for reference).
-  - Provides an interactive **Expert Correction Area**.
-- **Keyboard-First Navigation:**
-  - Cycle through words in the target sentence using `ArrowLeft` and `ArrowRight`.
-  - Submit a corrected sentence or confirm it's correct using `Ctrl+Enter`.
-- **Inline Word Correction:**
-  - Select a word in the target sentence.
-  - Activate correction mode (e.g., `Enter` key or double-click).
-  - An inline input field appears for quick word replacement.
-  - The main sentence updates instantly.
-- **Mouse Support:** While keyboard-centric, mouse interactions (clicking words, buttons) are also supported.
-- **Minimalist UI:** Clean interface styled with Tailwind CSS (via CDN).
-- **Hardcoded Data:** For this PoC, sentence pairs are hardcoded in the JavaScript.
-- **Instant Feedback:** Changes are reflected immediately in the UI.
+Reviewing and correcting Large Language Model (LLM) outputs, especially for tasks demanding deep linguistic expertise, can be a laborious process. Standard text editors or generic annotation tools often introduce inefficiencies, such as requiring excessive mouse use, lacking specialized navigation, or causing context switches. LabelFast aims to provide a highly streamlined interface tailored for rapid, accurate correction of sequential text data.
 
-## Visual (Placeholder)
+## Key Features (v003 - ContentEditable + Spacebar Navigation)
 
-_(Add a screenshot or a GIF of the interface in action once developed. e.g., `![LabelFast Interface](docs/screenshot.gif)`)_
+This version (v003) builds upon previous iterations to further enhance the low-friction experience:
 
-## Technology Stack
+- **Single HTML File:** All necessary HTML, CSS (via Tailwind CDN), and JavaScript are contained in one file for extreme portability and ease of deployment for this PoC stage.
+- **Sentence-by-Sentence Workflow:**
+  - Displays the original **Source Text** (non-editable).
+  - Displays the initial **LLM Target Text** (non-editable, for reference).
+  - Provides an interactive **Expert Correction Area** populated with the LLM target.
+- **Enhanced Keyboard-First Navigation & Interaction:**
+  - **Spacebar Navigation (New in v003):**
+    - `Space`: Select next word (when not editing a word).
+    - `Shift + Space`: Select previous word (when not editing a word).
+  - `ArrowLeft` / `ArrowRight`: Select previous/next word.
+  - `Enter` / `F2` (on selected word): Activate word correction mode.
+  - `Delete` / `Backspace` (on selected word): Delete the word.
+  - `Ctrl + Enter`: Submit current correction and advance to the next sentence.
+  - `Escape`:
+    - If help modal is open: Close help modal.
+    - If editing a word: Cancel current word edit.
+    - If not editing & help closed: Reset current sentence to original LLM target.
+  - `?` / `F1`: Toggle help modal.
+- **Inline Word Correction with `contenteditable` (Refined in v003):**
+  - Selected words become directly editable `<span>` elements, offering a more seamless "type-in-place" experience compared to a separate input field.
+  - The main sentence structure updates dynamically and instantly.
+- **Mouse Support:** Click to select words, click buttons.
+- **Minimalist UI:** Clean interface styled with Tailwind CSS.
+- **Hardcoded Data:** Sentence pairs are currently hardcoded in JavaScript for PoC demonstration.
+- **Help Modal:** On-demand instructions for keyboard shortcuts.
+
+## Visual (Placeholder for v003)
+
+![LabelFast v003 Interface Example - Word Edit](https://i.imgur.com/kEeVN7x.png)
+_(Replace with an actual GIF/screenshot of v003 in action)_
+
+## Technology Stack (PoC v003)
 
 - **HTML5**
 - **Tailwind CSS** (via CDN for styling)
-- **Vanilla JavaScript** (for all logic and interactivity)
+- **Vanilla JavaScript** (for all logic and interactivity – no frameworks like React/Vue used for this PoC)
 
 ## Getting Started / Usage
 
-This is a self-contained single-page application.
+This is a self-contained single-HTML-file application.
 
-1.  **Download/Clone:**
-    - Simply download the `index.html` file.
-    - Or, clone this repository:
-      ```bash
-      git clone [URL_OF_YOUR_REPO]
-      cd [REPO_NAME]
-      ```
+1.  **Download:**
+    - Obtain the `index.html` (or version-specific, e.g., `labelfast_v003.html`) file.
 2.  **Open in Browser:**
+    - Open the HTML file in any modern web browser (e.g., Chrome, Firefox, Edge, Safari).
+3.  **How to Use the Interface (v003):**
+    - The first source sentence and its LLM-generated target are displayed. The "Your Correction" area is pre-filled.
+    - **Navigation (when not editing a word):**
+      - Use `Space` (next) / `Shift + Space` (previous) for rapid word selection.
+      - Alternatively, use `ArrowLeft` / `ArrowRight` or click a word.
+    - **Correction:**
+      - Once a word is selected, press `Enter` or `F2` (or double-click) to edit it.
+      - The word becomes directly editable. Type your changes. `Space` inserts a space.
+      - Press `Enter` to confirm the word change (selection moves to the next word).
+      - Press `Esc` to cancel the current word edit.
+      - Use `Delete` or `Backspace` on a selected word (when not in edit mode) to remove it.
+    - **Submission/Reset:**
+      - If the sentence is correct or after corrections, press `Ctrl+Enter` or click "Submit & Next".
+      - Use the "Reset Current (Esc)" button or press `Esc` (when not editing/help closed) to revert the current sentence.
+    - A "Completed!" message appears after all sentences.
+    - Corrected data is logged to the browser's developer console for this PoC.
+    - Press `?` or `F1` for a shortcuts cheat sheet.
 
-    - Open the `index.html` file in any modern web browser (e.g., Chrome, Firefox, Edge, Safari).
+## Current Status & Next Steps (Beyond PoC)
 
-3.  **How to Use the Interface:**
-    - The first source sentence and its LLM-generated target will be displayed.
-    - The "Expert Correction Area" will be populated with the target sentence.
-    - **If the sentence is correct:**
-      - Press `Ctrl+Enter` or click "Submit & Next".
-    - **If the sentence needs correction:**
-      - Use `ArrowLeft` / `ArrowRight` keys or click to select a word in the "Expert Correction Area".
-      - Press `Enter` (or your configured key/double-click) on the selected word to edit it. An input field will appear.
-      - Type your correction and press `Enter` (in the input field) or click away. The word will be updated.
-      - You can also use the `Delete` key to remove a selected word.
-      - Once all corrections are made, press `Ctrl+Enter` or click "Submit & Next".
-    - Use the "Reset Current Sentence" button to revert changes for the current sentence pair.
-    - Progress through all available sentences. A "Completed" message will appear at the end.
-    - Corrected data (for this PoC) is logged to the browser's developer console.
+This project (v003) is a robust **Proof of Concept** validating the core interaction model. The immediate next steps, should this proceed to a production tool, would involve:
 
-## Current Status
-
-This project is currently a **Proof of Concept (PoC)**. The primary goal is to validate the core interaction model for low-friction text correction.
+1.  **Backend Integration:**
+    - Loading sentence data dynamically (e.g., from JSON, CSV, or a database via an API).
+    - Saving corrected annotations back to a persistent store.
+    - Potential frameworks: Django/Flask (Python) with HTMX for dynamic HTML partials, or a lightweight API for a VanillaJS/AlpineJS frontend.
+2.  **User Authentication & Management:** If multiple annotators or projects are involved.
+3.  **Configuration:** Allow customization of shortcuts or UI elements.
 
 ## Future Ideas / Potential Roadmap
 
-- Dynamic loading of sentence data (e.g., from JSON, CSV, or an API).
-- Backend integration for saving corrected annotations.
-- User authentication and project management.
-- Configuration options for keyboard shortcuts.
-- Support for different types of annotations (e.g., named entity tagging within the correction).
-- Inter-annotator agreement checks.
-- Metrics and progress tracking.
+- Support for different types of annotations (e.g., span-based tagging, classification).
+- Inter-annotator agreement tools.
+- Progress tracking and project dashboards.
+- Advanced search and filtering of sentences.
+- Integration with version control for annotation datasets.
 
 ## Contributing
 
-As a PoC, contributions for bug fixes or minor improvements to the core interaction are welcome. For larger changes or features, please open an issue first to discuss.
+For this PoC stage, contributions focused on refining the core low-friction interaction model or fixing bugs are welcome. For larger features, please open an issue for discussion first.
 
 1.  Fork the Project.
-2.  Create your Feature Branch (`git checkout -b feature/AmazingFeature`).
-3.  Commit your Changes (`git commit -m 'Add some AmazingFeature'`).
-4.  Push to the Branch (`git push origin feature/AmazingFeature`).
+2.  Create your Feature Branch (`git checkout -b feature/CoolImprovement`).
+3.  Commit your Changes (`git commit -m 'Add CoolImprovement'`).
+4.  Push to the Branch (`git push origin feature/CoolImprovement`).
 5.  Open a Pull Request.
 
 ## License
 
-Distributed under the MIT License. See `LICENSE` file for more information (though for a single HTML file PoC, you might just state it here if you don't have a separate LICENSE file).
+Distributed under the MIT License. (Assume MIT unless specified otherwise).
