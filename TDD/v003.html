@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Text Annotation Tool v003 (ContentEditable + Space Nav)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      .editable-word {
+        outline: none;
+        min-width: 60px;
+        display: inline-block;
+        vertical-align: baseline;
+      }
+      kbd {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+          "Liberation Mono", "Courier New", monospace;
+        padding: 0.25rem 0.5rem;
+        background-color: #e5e7eb; /* gray-200 */
+        border-radius: 0.25rem;
+        border: 1px solid #d1d5db; /* gray-300 */
+        box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
+        color: #374151; /* gray-700 */
+        font-size: 0.875em;
+      }
+    </style>
+  </head>
+  <body
+    class="min-h-screen bg-gray-100 flex flex-col items-center justify-center p-4 font-sans"
+  >
+    <div
+      id="appContainer"
+      data-testid="app-container"
+      class="bg-white shadow-xl rounded-lg p-6 md:p-8 w-full max-w-3xl"
+    >
+      <h1 class="text-2xl font-bold text-center text-gray-700 mb-6">
+        Sentence Correction (v003 CE + Space Nav)
+      </h1>
+
+      <div>
+        <p class="text-sm font-semibold text-gray-700 mb-1">Source (المصدر)</p>
+        <div
+          id="sourceSentence"
+          data-testid="source-sentence"
+          dir="rtl"
+          class="mb-4 p-3 bg-slate-200 rounded text-slate-800 text-lg min-h-[40px]"
+        ></div>
+      </div>
+
+      <div>
+        <p class="text-sm font-semibold text-gray-700 mb-1">
+          LLM Output (ترجمة الآلة)
+        </p>
+        <div
+          id="llmTargetSentence"
+          data-testid="llm-target-sentence"
+          dir="rtl"
+          class="mb-4 p-3 bg-amber-100 rounded text-amber-800 text-lg min-h-[40px]"
+        ></div>
+      </div>
+
+      <div>
+        <p class="text-sm font-semibold text-gray-700 mb-1">
+          Your Correction (التصحيح)
+        </p>
+        <div
+          id="correctionArea"
+          data-testid="correction-area"
+          dir="rtl"
+          class="mb-6 p-3 border-2 border-blue-500 rounded text-lg min-h-[70px] flex flex-wrap gap-x-2 gap-y-1 items-center focus:outline-none"
+          tabindex="0"
+        >
+          <!-- Words will be injected here -->
+        </div>
+      </div>
+
+      <div class="flex flex-col sm:flex-row justify-end gap-2">
+        <button
+          id="resetBtn"
+          class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+        >
+          Reset Current (Esc)
+        </button>
+        <button
+          id="submitBtn"
+          class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+        >
+          Submit & Next (Ctrl+Enter)
+        </button>
+      </div>
+
+      <div
+        id="statusText"
+        data-testid="status-text"
+        class="text-sm text-gray-600 mt-6 text-center"
+      ></div>
+    </div>
+
+    <!-- Help Button -->
+    <button
+      id="helpToggleBtn"
+      data-testid="help-toggle-button"
+      title="Help (? or F1)"
+      class="fixed bottom-4 right-4 bg-sky-500 hover:bg-sky-600 text-white font-bold p-2 rounded-full shadow-lg w-10 h-10 flex items-center justify-center text-xl z-40"
+    >
+      ?
+    </button>
+
+    <!-- Help Modal -->
+    <div
+      id="helpModal"
+      class="fixed inset-0 bg-gray-800 bg-opacity-75 hidden items-center justify-center p-4 z-50"
+      aria-modal="true"
+      role="dialog"
+    >
+      <div class="bg-white p-6 md:p-8 rounded-lg shadow-xl max-w-xl w-full">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-xl font-bold text-gray-800">Help & Shortcuts</h2>
+          <button
+            id="closeHelpModalBtn"
+            class="text-gray-500 hover:text-gray-700 text-3xl leading-none"
+            aria-label="Close help modal"
+          >
+            &times;
+          </button>
+        </div>
+        <div class="text-gray-700 space-y-3 text-sm sm:text-base">
+          <p>
+            <strong
+              >Word Navigation & Selection (in "Your Correction" area):</strong
+            >
+          </p>
+          <ul class="list-disc list-inside ml-4 space-y-1">
+            <li><kbd>Space</kbd>: Next word (when not editing).</li>
+            <li>
+              <kbd>Shift</kbd> + <kbd>Space</kbd>: Previous word (when not
+              editing).
+            </li>
+            <li><kbd>←</kbd> / <kbd>→</kbd>: Select previous/next word.</li>
+            <li>Click on a word: Selects it.</li>
+          </ul>
+          <p><strong>Word Correction:</strong></p>
+          <ul class="list-disc list-inside ml-4 space-y-1">
+            <li>
+              <kbd>Enter</kbd> / <kbd>F2</kbd> / Double-click (on selected
+              word): Start editing the word.
+            </li>
+            <li>
+              While editing:
+              <ul class="list-['◦'] list-inside ml-6 space-y-1">
+                <li>Type your correction. <kbd>Space</kbd> inserts a space.</li>
+                <li>
+                  <kbd>Enter</kbd>: Confirm word change (moves to next word if
+                  not last).
+                </li>
+                <li>
+                  <kbd>Esc</kbd>: Cancel word change and revert to original.
+                </li>
+              </ul>
+            </li>
+            <li>
+              <kbd>Delete</kbd> / <kbd>Backspace</kbd> (on selected word):
+              Delete the word.
+            </li>
+          </ul>
+          <p><strong>Sentence Actions:</strong></p>
+          <ul class="list-disc list-inside ml-4 space-y-1">
+            <li>
+              <kbd>Ctrl</kbd> + <kbd>Enter</kbd>: Submit current correction and
+              load next sentence.
+            </li>
+            <li>
+              <kbd>Esc</kbd> (when not editing a word and help is closed): Reset
+              current sentence to LLM's original translation.
+            </li>
+          </ul>
+          <p><strong>Help Dialog:</strong></p>
+          <ul class="list-disc list-inside ml-4 space-y-1">
+            <li>
+              Click the
+              <span
+                class="inline-flex items-center justify-center bg-sky-500 text-white font-bold w-5 h-5 rounded-full text-xs"
+                >?</span
+              >
+              button: Show/hide this help.
+            </li>
+            <li>
+              <kbd>?</kbd> (Shift + /) or <kbd>F1</kbd>: Show/hide this help.
+            </li>
+            <li><kbd>Esc</kbd> (when help is open): Close this help.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <script src="./app.js" defer></script>
+  </body>
+</html>
