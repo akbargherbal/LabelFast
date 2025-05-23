@@ -1,0 +1,11 @@
+This is our [X] session in an ongoing series. To begin, I’d like you to reacquaint yourself with the overall objectives of this project.
+Please review the codebase given to you in the attachments, paying particular attention to the following docs:
+* The `TDD/docs` directory, specifically:
+  * `LGID_FE Paper`
+  * `README.md`
+  * `PoC_Hardening_Guide.md` and `PoC_Interaction_Spec.md` docs
+Confirm that you have reviewed the codebase, read the relevant docs especially the LGID_FE paper.
+Later in this session, I’ll provide the context you wrote for yourself at the end of the previous session. We'll update that context in each session to reflect what has been accomplished and outline plans for the next session.
+--------
+In each session, we document our progress and upcoming tasks in a single file called context.md. Please review this file to understand our current status and the objectives for this session.
+
