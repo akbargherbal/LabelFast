@@ -1,4 +1,5 @@
 ## IMPORTANT INSTRUCTIONS FOR ALL SESSSIONS:
+
 When providing code modifications, adhere to the following presentation guidelines:
 
 1.  **For minor changes confined to a single function or a small, clearly defined block of code (e.g., changing, adding, or removing a few lines):** You must provide the **entire modified function** or block, clearly indicating the start and end of this block. Do not provide only the changed lines or diff-like patches.
@@ -321,3 +322,86 @@ In both cases, you should still provide your reasoning and identify the location
 3.  Continue iteratively through the modules defined in `PoC_Hardening_Guide.md` (Modules 7, 8, 9 remain).
 
 ---
+
+## Session 5 Context
+
+**Date:** (Today's Date - e.g., 2025-05-23)
+
+**Input from Previous Sessions:**
+
+- `v003.html`, `app.js` (updated from Session 4), `README.md`, `LGID_FE.md`, `PoC_Interaction_Spec.md`.
+- `PoC_Hardening_Guide.md` (updated for Modules 1-5).
+- Jest testing environment, `__tests__/initial_load.test.js`, `__tests__/correction_area_rendering.test.js`, `__tests__/word_selection_navigation.test.js`, `__tests__/word_editing_flow.test.js`, `__tests__/word_deletion.test.js`.
+
+**Session 4 Summary (Recap):**
+
+1.  **Module 5 (Word Deletion):** Completed and verified. `app.js` updated with fixes in `deleteSelectedWord` and `globalKeyHandler` (added `stopImmediatePropagation`). `__tests__/word_deletion.test.js` (11 tests) created and passing. `PoC_Hardening_Guide.md` updated.
+2.  Total tests at end of Session 4: 70.
+
+---
+
+**Session 5 Activities & Outcomes:**
+
+1.  **Reviewed Plan:** Confirmed focus on Module 6.
+2.  **Phase 6-HR (Module 6: Sentence Reset Functionality):**
+    - **Target JS:** `handleReset()`, `resetBtn` click listener, relevant part of `globalKeyHandler()` (`Esc`).
+    - **Step 6.A (Generate Tests):** Created `__tests__/sentence_reset.test.js`. Drafted 10 comprehensive tests covering:
+      - Reset via Reset button and Escape key.
+      - Correct reversion of `correctedWords` to `originalTargetForReset`.
+      - Appropriate selection updates (to first word or -1 if empty).
+      - UI re-rendering and empty message display.
+      - `isEditingWord` state after reset.
+      - Guard conditions (`isEditingWord`, `allCompleted`, help modal open).
+      - Verification of `e.preventDefault()` and `correctionAreaEl.focus()` calls.
+      - Handling of reset when `originalTargetForReset` is empty.
+    - **Step 6.B (Execute Tests) & 6.C (Refine/Fix PoC JavaScript):**
+      - Initial tests (4 failures) revealed issues with focus assertions and the `isEditingWord` state when `Esc` is pressed during an active edit.
+      - **Refinement 1 (app.js):** Modified `handleReset()` to ensure `window.correctionAreaEl.focus()` is called consistently after reset logic, regardless of whether the sentence becomes empty or not.
+      - **Refinement 2 (test.js):** In `__tests__/sentence_reset.test.js`, for the test `Escape key does not trigger reset if isEditingWord is true...`, changed the event dispatch target from `document` to the `activeEditable` element itself. This ensured the specific `keydown` listener on the contenteditable span (which calls `cancelWordEdit` and `stopPropagation`) was correctly triggered, leading to `isEditingWord` becoming `false` as expected by `cancelWordEdit`.
+      - After these iterations, all 10 tests for Module 6 passed.
+    - **Step 6.D (Manual Spot-Check & Regression):**
+      - All previous modules' tests (70 tests) re-ran and passed alongside Module 6 tests. Total 80 tests passing.
+      - User confirmed manual spot-check of sentence reset functionality (button and Esc key) in the browser is working as expected.
+    - **Step 6.E (Documentation & Commit):**
+      - `PoC_Hardening_Guide.md` updated to mark Module 6 as "Verified & Hardened".
+      - User confirmed all changes (updated `app.js`, new `__tests__/sentence_reset.test.js`, updated `PoC_Hardening_Guide.md`) are committed.
+    - **Module 6 Completion:** Module 6 is "COMPLETE & VERIFIED".
+
+**Current LGID-HR Stage (End of Session 5):**
+
+- **Phase 0-HR: COMPLETE.**
+- **Phase 1-HR (Module 1: Initial State & Sentence Loading): COMPLETE & VERIFIED.** (7 tests)
+- **Phase 2-HR (Module 2: Word Tokenization & Rendering in Correction Area): COMPLETE & VERIFIED.** (17 tests)
+- **Phase 3-HR (Module 3: Word Selection & Navigation): COMPLETE & VERIFIED.** (21 tests)
+- **Phase 4-HR (Module 4: Word Editing Flow (ContentEditable)): COMPLETE & VERIFIED.** (14 tests)
+- **Phase 5-HR (Module 5: Word Deletion): COMPLETE & VERIFIED.** (11 tests)
+- **Phase 6-HR (Module 6: Sentence Reset Functionality): COMPLETE & VERIFIED.** (10 tests)
+  - Total tests passed: 7 + 17 + 21 + 14 + 11 + 10 = **80 tests**.
+  - `app.js` updated with refinements in `handleReset()`.
+
+---
+
+**Plan for Next Session (Session 6):**
+
+1.  **(Git Workflow):**
+    - (Already done by user for Session 5 changes).
+2.  **Begin Phase 7-HR (Module 7: Sentence Submission & Progression):**
+    - Refer to `PoC_Hardening_Guide.md` for Module 7's scope:
+      - **Target JS:** `handleSubmit()`, `submitBtn` click listener, relevant part of `globalKeyHandler()` (`Ctrl+Enter`), interaction with `loadSentence()`.
+      - **Key Test Scenarios/Objectives:**
+        - Clicking `#submitBtn` or pressing `Ctrl+Enter` calls `handleSubmit()`.
+        - `console.log` is called with correct data (mock/spy on `console.log`).
+        - `currentSentenceIndex` is incremented.
+        - `loadSentence()` is called with the new index.
+        - Verify UI updates to reflect the next sentence (source, target, correction area, status text).
+        - Verify UI updates to "Completed!" state after the last sentence.
+        - Cannot submit if `isEditingWord` is true or `allCompleted` is true (guard conditions).
+    - **Step 7.A (Generate Tests):** Collaboratively generate a new test file (e.g., `__tests__/sentence_submission.test.js`).
+    - **Step 7.B (Execute Tests):** Run new tests.
+    - **Step 7.C (Refine/Fix PoC JavaScript):** Refine/fix `app.js` until Module 7 tests pass.
+    - **Step 7.D (Manual Spot-Check & Regression):** Briefly check submission in browser; re-run all previous modules' tests (80 tests).
+    - **Step 7.E (Documentation & Commit):** Update `PoC_Hardening_Guide.md` and commit changes.
+3.  Continue iteratively through the modules defined in `PoC_Hardening_Guide.md` (Modules 8, 9 remain after Module 7).
+
+---
+

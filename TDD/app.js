@@ -354,21 +354,27 @@ function initializeApp() {
   }
   window.handleSubmit = handleSubmit;
 
+  // jjj
+
   function handleReset() {
     if (window.allCompleted || window.isEditingWord) return; // Prevent reset if editing
 
     window.correctedWords = normalizeWords(window.originalTargetForReset);
     window.selectedWordIndex = window.correctedWords.length > 0 ? 0 : -1;
     window.isEditingWord = false; // Ensure not in editing mode
-    // renderCorrectionArea(); // selectWord handles this or direct render if empty
 
     if (window.selectedWordIndex !== -1) {
       selectWord(window.selectedWordIndex);
     } else {
       renderCorrectionArea(); // Render empty message
-      window.correctionAreaEl.focus();
+      // window.correctionAreaEl.focus(); // Focus call moved
     }
+    window.correctionAreaEl.focus(); // MODIFIED: Always focus correctionAreaEl after reset logic
   }
+  window.handleReset = handleReset;
+
+  // jjj
+
   window.handleReset = handleReset;
 
   function showHelpModal() {
