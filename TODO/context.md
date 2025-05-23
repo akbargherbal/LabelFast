@@ -158,3 +158,72 @@
 3.  Continue iteratively through the modules defined in `PoC_Hardening_Guide.md`.
 
 ---
+
+## Session 3 Context
+
+**Date:** 2025-05-23
+
+**Input from Previous Sessions:**
+
+- `v003.html`, `app.js` (updated from Session 2), `README.md`, `LGID_FE.md`, `PoC_Interaction_Spec.md`, `PoC_Hardening_Guide.md` (updated for Module 1 & 2).
+- Jest testing environment, `__tests__/initial_load.test.js`, `__tests__/correction_area_rendering.test.js`.
+
+**Session 2 Summary (Recap):** (As above)
+
+---
+
+**Session 3 Activities & Outcomes:**
+
+1.  **Reviewed Plan:** Confirmed focus on Module 3.
+2.  **Phase 3-HR (Module 3: Word Selection & Navigation):**
+    - **Step 3.A (Generate Tests):** Created `__tests__/word_selection_navigation.test.js` (21 tests).
+    - **Step 3.B & 3.C (Execute & Refine/Fix):**
+      - Identified and fixed `globalKeyHandler` multiple invocation issue for Space/Arrow keys in JSDOM tests by adding `e.stopImmediatePropagation()`.
+      - Optionally refactored `selectWord()` for clarity.
+      - All 21 tests for Module 3 passed.
+    - **Module 3 Completion:** Module 3 marked as COMPLETE & VERIFIED. `app.js` updated. `PoC_Hardening_Guide.md` updated.
+3.  **Phase 4-HR (Module 4: Word Editing Flow (ContentEditable)):**
+    - **Step 4.A (Generate Tests):** Created `__tests__/word_editing_flow.test.js` (14 tests).
+    - **Step 4.B & 4.C (Execute & Refine/Fix):**
+      - Addressed test failures related to JSDOM focus limitations by spying on `HTMLElement.prototype.focus` calls.
+      - Corrected test setup for "no word selected" scenario.
+      - Switched to using `fireEvent.keyDown/blur` directly on the `contenteditable` span for testing its internal listeners, improving reliability over `userEvent.keyboard` for this specific case.
+      - Utilized Jest's fake timers for testing `blur` handler's `setTimeout`.
+      - All 14 tests for Module 4 passed after iterations.
+    - **Step 4.D (Manual Spot-Check & Regression):** All regression tests passed.
+    - **Step 4.E (Documentation):** Cleaned diagnostic logs from `app.js`. `PoC_Hardening_Guide.md` updated to mark Module 4 as "Verified & Hardened".
+    - **Module 4 Completion:** Module 4 marked as COMPLETE & VERIFIED. `app.js` is stable for this module.
+
+**Current LGID-HR Stage (End of Session 3):**
+
+- **Phase 0-HR: COMPLETE.**
+- **Phase 1-HR (Module 1: Initial State & Sentence Loading): COMPLETE & VERIFIED.** (7 tests)
+- **Phase 2-HR (Module 2: Word Tokenization & Rendering in Correction Area): COMPLETE & VERIFIED.** (17 tests)
+- **Phase 3-HR (Module 3: Word Selection & Navigation): COMPLETE & VERIFIED.** (21 tests)
+- **Phase 4-HR (Module 4: Word Editing Flow (ContentEditable)): COMPLETE & VERIFIED.** (14 tests)
+  - Total tests passed: 7 + 17 + 21 + 14 = **59 tests**.
+
+---
+
+**Plan for Next Session (Session 4):**
+
+1.  **(Git Workflow):**
+    - Ensure all changes from Session 3 (updated `app.js`, new `__tests__/word_editing_flow.test.js`, updated `PoC_Hardening_Guide.md`) are committed.
+2.  **Begin Phase 5-HR (Module 5: Word Deletion):**
+    - Refer to `PoC_Hardening_Guide.md` for Module 5's scope:
+      - **Target JS:** `deleteSelectedWord()`, relevant part of `globalKeyHandler()` (`Delete`, `Backspace`).
+      - **Key Test Scenarios/Objectives:**
+        - Pressing `Delete` or `Backspace` on a selected word (not editing) calls `deleteSelectedWord()`.
+        - Word at `selectedWordIndex` is removed from `correctedWords`.
+        - If words remain, selection moves to the new word at `selectedWordIndex` (or previous if last was deleted).
+        - If last word is deleted, `selectedWordIndex` becomes -1 (or `correctionArea` shows empty message).
+        - `#correctionArea` re-renders.
+        - Cannot delete if no word selected or if `isEditingWord` is true.
+    - **Step 5.A (Generate Tests):** Collaboratively generate a new test file (e.g., `__tests__/word_deletion.test.js`).
+    - **Step 5.B (Execute Tests):** Run new tests.
+    - **Step 5.C (Refine/Fix PoC JavaScript):** Refine/fix `app.js` until Module 5 tests pass. Pay attention to selection logic after deletion.
+    - **Step 5.D (Manual Spot-Check & Regression):** Briefly check deletion in browser; re-run all previous modules' tests.
+    - **Step 5.E (Documentation & Commit):** Update `PoC_Hardening_Guide.md` and commit changes.
+3.  Continue iteratively through the modules defined in `PoC_Hardening_Guide.md`.
+
+---

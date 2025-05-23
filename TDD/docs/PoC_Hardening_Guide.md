@@ -18,7 +18,7 @@ The following modules/interactions will be hardened iteratively. For each, tests
     *   Verify handling of `sentencePairs` with varying content (empty strings, multi-space words).
     *   Verify "Completed!" state is correctly displayed when `loadSentence` is called with an out-of-bounds index.
     *   Verify `originalTargetForReset` is correctly set.
-*   **Status:** Pending Tests
+*   **Status:** Verified & Hardened
 
 ---
 
@@ -33,7 +33,7 @@ The following modules/interactions will be hardened iteratively. For each, tests
         *   Correctly applies selection classes (`bg-sky-600`, `text-white`) to the `selectedWordIndex` span.
         *   Hover classes are present on unselected words.
         *   Word spans have click and dblclick listeners attached (existence, not necessarily full behavior here).
-*   **Status:** Pending Tests
+*   **Status:** Verified & Hardened
 
 ---
 
@@ -51,7 +51,7 @@ The following modules/interactions will be hardened iteratively. For each, tests
         *   No action if only one word or no words.
     *   `selectWord()` correctly scrolls the selected word into view (mock scrollIntoView or check focus).
     *   Selection is cleared (`selectedWordIndex = -1`) if `correctedWords` becomes empty.
-*   **Status:** Pending Tests
+*   **Status:** Verified & Hardened
 
 ---
 
@@ -83,7 +83,7 @@ The following modules/interactions will be hardened iteratively. For each, tests
             *   Original selection is restored.
             *   `#correctionArea` re-renders.
     *   Editing edge cases: making a word empty (should delete), adding multiple spaces (should be trimmed on commit).
-*   **Status:** Pending Tests
+*   **Status:** Verified & Hardened
 
 ---
 

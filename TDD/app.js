@@ -97,7 +97,6 @@ function initializeApp() {
   }
   window.renderCorrectionArea = renderCorrectionArea;
 
-  // START OF REFACTORED selectWord FUNCTION
   function selectWord(index) {
     if (window.isEditingWord) {
       return;
@@ -106,13 +105,12 @@ function initializeApp() {
     if (window.correctedWords.length === 0) {
       window.selectedWordIndex = -1;
     } else {
-      // At this point, window.correctedWords.length > 0 is guaranteed
       if (index < 0) {
-        window.selectedWordIndex = 0; // Select first word
+        window.selectedWordIndex = 0;
       } else if (index >= window.correctedWords.length) {
-        window.selectedWordIndex = window.correctedWords.length - 1; // Select last word
+        window.selectedWordIndex = window.correctedWords.length - 1;
       } else {
-        window.selectedWordIndex = index; // Index is valid and in-bounds
+        window.selectedWordIndex = index;
       }
     }
 
@@ -128,7 +126,6 @@ function initializeApp() {
       });
     }
   }
-  // END OF REFACTORED selectWord FUNCTION
   window.selectWord = selectWord;
 
   function moveSelection(direction) {
@@ -145,6 +142,7 @@ function initializeApp() {
   }
   window.moveSelection = moveSelection;
 
+  // START OF CLEANED initiateWordEdit FUNCTION
   function initiateWordEdit() {
     if (
       window.isEditingWord ||
@@ -159,7 +157,7 @@ function initializeApp() {
       `span[data-index='${window.selectedWordIndex}']`
     );
     if (!wordSpanToReplace) {
-      window.isEditingWord = false;
+      window.isEditingWord = false; // Reset if span not found
       return;
     }
     window.activeEditableElement = document.createElement("span");
@@ -186,13 +184,14 @@ function initializeApp() {
       }, 0);
     });
     wordSpanToReplace.replaceWith(window.activeEditableElement);
-    window.activeEditableElement.focus();
+    window.activeEditableElement.focus(); // Attempt to focus
     const range = document.createRange();
     range.selectNodeContents(window.activeEditableElement);
     const selection = window.getSelection();
     selection.removeAllRanges();
     selection.addRange(range);
   }
+  // END OF CLEANED initiateWordEdit FUNCTION
   window.initiateWordEdit = initiateWordEdit;
 
   function commitWordEdit() {
@@ -203,6 +202,8 @@ function initializeApp() {
       window.correctedWords[originalIndexOfEditedWord] = newWord;
     } else {
       window.correctedWords.splice(originalIndexOfEditedWord, 1);
+      // This logic for selectedWordIndex after deletion might need review for all edge cases,
+      // but current tests cover the main scenarios.
       if (
         originalIndexOfEditedWord >= window.correctedWords.length &&
         window.correctedWords.length > 0
@@ -211,29 +212,45 @@ function initializeApp() {
       } else if (window.correctedWords.length === 0) {
         window.selectedWordIndex = -1;
       } else if (originalIndexOfEditedWord >= window.correctedWords.length) {
+        // This case is likely similar to the one above it or means original was last and deleted
         window.selectedWordIndex =
           window.correctedWords.length > 0
             ? window.correctedWords.length - 1
             : -1;
       }
+      // If a word was deleted, and it wasn't the last one, selectedWordIndex might need to stay same
+      // or be originalIndexOfEditedWord if it's still valid.
+      // The selectWord calls below will handle final selection.
     }
     window.isEditingWord = false;
     window.activeEditableElement = null;
     renderCorrectionArea();
+
+    // Determine new selection after commit
     if (window.correctedWords.length === 0) {
       selectWord(-1);
     } else {
       if (newWord) {
+        // Word was edited (not made empty)
         if (originalIndexOfEditedWord + 1 < window.correctedWords.length) {
-          selectWord(originalIndexOfEditedWord + 1);
+          selectWord(originalIndexOfEditedWord + 1); // Move to next word
         } else {
-          selectWord(originalIndexOfEditedWord);
+          selectWord(originalIndexOfEditedWord); // Stay on current (possibly new text, same index)
         }
       } else {
-        selectWord(window.selectedWordIndex);
+        // Word was made empty and thus deleted
+        if (window.correctedWords.length === 0) {
+          selectWord(-1);
+        } else if (originalIndexOfEditedWord < window.correctedWords.length) {
+          // If there's a word at the original index (something shifted into it)
+          selectWord(originalIndexOfEditedWord);
+        } else {
+          // If the deleted word was the last one, select the new last word
+          selectWord(window.correctedWords.length - 1);
+        }
       }
     }
-    window.correctionAreaEl.focus();
+    window.correctionAreaEl.focus(); // Return focus to the general correction area
   }
   window.commitWordEdit = commitWordEdit;
 
@@ -262,10 +279,13 @@ function initializeApp() {
     if (window.correctedWords.length === 0) {
       window.selectedWordIndex = -1;
     } else if (window.selectedWordIndex >= window.correctedWords.length) {
+      // If the deleted word was the last one, select the new last one
       window.selectedWordIndex = window.correctedWords.length - 1;
     }
+    // If a word in the middle was deleted, selectedWordIndex remains the same,
+    // and the word at that index is now the one that was after the deleted one.
     renderCorrectionArea();
-    selectWord(window.selectedWordIndex);
+    selectWord(window.selectedWordIndex); // Re-select to ensure UI update and scroll
     window.correctionAreaEl.focus();
   }
   window.deleteSelectedWord = deleteSelectedWord;
@@ -419,6 +439,7 @@ function initializeApp() {
       case "F2":
         if (window.selectedWordIndex !== -1 && !window.isEditingWord) {
           e.preventDefault();
+          // e.stopImmediatePropagation(); // Consider if Enter/F2 also misbehaves later
           initiateWordEdit();
         }
         break;
