@@ -1,3 +1,13 @@
+IMPORTANT INSTRUCTIONS FOR ALL SESSSIONS:
+When providing code modifications, adhere to the following presentation guidelines:
+
+1.  **For minor changes confined to a single function or a small, clearly defined block of code (e.g., changing, adding, or removing a few lines):** You must provide the **entire modified function** or block, clearly indicating the start and end of this block. Do not provide only the changed lines or diff-like patches.
+2.  **For changes that affect multiple functions, or involve refactoring across different parts of the script:** You must provide the **complete, updated script** in its entirety.
+
+In both cases, you should still provide your reasoning and identify the locations of changes as part of your explanation before presenting the code.
+
+---
+
 ## Session 1 Context: LabelFast Project (LGID-HR Frontend Hardening)
 
 **Date:** (Today's Date - e.g., 2025-05-11)

@@ -18,12 +18,13 @@ function initializeApp() {
   ];
 
   let currentSentenceIndex = 0;
-  let correctedWords = [];
+  let correctedWords = []; // This is locally scoped to initializeApp
   let isEditingWord = false;
   let activeEditableElement = null;
   let originalTargetForReset = "";
   let allCompleted = false;
 
+  // DOM Elements assigned to window scope
   window.sourceSentenceEl = document.getElementById("sourceSentence");
   window.llmTargetSentenceEl = document.getElementById("llmTargetSentence");
   window.correctionAreaEl = document.getElementById("correctionArea");
@@ -35,13 +36,14 @@ function initializeApp() {
   window.helpToggleBtn = document.getElementById("helpToggleBtn");
   window.helpModal = document.getElementById("helpModal");
   window.closeHelpModalBtn = document.getElementById("closeHelpModalBtn");
-  let isHelpModalOpen = false;
-  let elementThatHadFocusBeforeModal;
+  let isHelpModalOpen = false; // Local to initializeApp, managed by help functions
+  let elementThatHadFocusBeforeModal; // Local to initializeApp
 
-  window.sentencePairs = sentencePairs;
+  // Global state variables assigned to window scope
+  window.sentencePairs = sentencePairs; // Make sentencePairs accessible globally if needed by tests or other modules
   window.currentSentenceIndex = currentSentenceIndex;
-  window.correctedWords = correctedWords;
-  window.selectedWordIndex = -1;
+  window.correctedWords = correctedWords; // window.correctedWords will be initially []
+  window.selectedWordIndex = -1; // Default selection
   window.isEditingWord = isEditingWord;
   window.activeEditableElement = activeEditableElement;
   window.originalTargetForReset = originalTargetForReset;
@@ -56,7 +58,7 @@ function initializeApp() {
     window.correctionAreaEl.innerHTML = "";
     if (window.correctedWords.length === 0 && !window.isEditingWord) {
       window.correctionAreaEl.innerHTML = `<span class="text-gray-400 italic">Sentence is empty. Use controls if needed.</span>`;
-      window.selectedWordIndex = -1;
+      window.selectedWordIndex = -1; // Ensure selection is cleared
       return;
     }
 
@@ -76,6 +78,8 @@ function initializeApp() {
 
       wordSpan.addEventListener("click", function handleClick() {
         if (window.isEditingWord) {
+          // If editing, clicks on other words should ideally commit current edit or do nothing
+          // For now, they do nothing.
           return;
         }
         selectWord(index_in_foreach);
@@ -83,16 +87,18 @@ function initializeApp() {
 
       wordSpan.addEventListener("dblclick", function handleDblClick() {
         if (window.isEditingWord) {
-          return;
+          return; // Don't initiate new edit if already editing
         }
-        selectWord(index_in_foreach);
-        initiateWordEdit();
+        selectWord(index_in_foreach); // Select first
+        initiateWordEdit(); // Then initiate edit
       });
       window.correctionAreaEl.appendChild(wordSpan);
     });
 
+    // Add a zero-width span to ensure the flex container has a baseline
+    // if all words are short and don't wrap, to maintain consistent height/gap.
     const flexGapFix = document.createElement("span");
-    flexGapFix.className = "w-0 h-0 p-0 m-0";
+    flexGapFix.className = "w-0 h-0 p-0 m-0"; // Or some other minimal, non-visible element
     window.correctionAreaEl.appendChild(flexGapFix);
   }
   window.renderCorrectionArea = renderCorrectionArea;
@@ -114,7 +120,7 @@ function initializeApp() {
       }
     }
 
-    renderCorrectionArea();
+    renderCorrectionArea(); // Re-render to apply/remove selection classes
     const selectedSpan = window.correctionAreaEl.querySelector(
       `span[data-index='${window.selectedWordIndex}']`
     );
@@ -134,15 +140,14 @@ function initializeApp() {
     }
     let newIndex = window.selectedWordIndex + direction;
     if (newIndex < 0) {
-      newIndex = window.correctedWords.length - 1;
+      newIndex = window.correctedWords.length - 1; // Wrap to last
     } else if (newIndex >= window.correctedWords.length) {
-      newIndex = 0;
+      newIndex = 0; // Wrap to first
     }
     selectWord(newIndex);
   }
   window.moveSelection = moveSelection;
 
-  // START OF CLEANED initiateWordEdit FUNCTION
   function initiateWordEdit() {
     if (
       window.isEditingWord ||
@@ -156,86 +161,81 @@ function initializeApp() {
     const wordSpanToReplace = window.correctionAreaEl.querySelector(
       `span[data-index='${window.selectedWordIndex}']`
     );
+
     if (!wordSpanToReplace) {
-      window.isEditingWord = false; // Reset if span not found
+      window.isEditingWord = false; // Should not happen if selectedWordIndex is valid
       return;
     }
+
     window.activeEditableElement = document.createElement("span");
     window.activeEditableElement.contentEditable = "true";
     window.activeEditableElement.textContent = wordToEdit;
     window.activeEditableElement.className =
-      "editable-word p-1 border border-blue-700 rounded shadow-sm focus:ring-2 focus:ring-blue-500 text-lg bg-white";
-    window.activeEditableElement.dir = window.correctionAreaEl.dir;
+      "editable-word p-1 border border-blue-700 rounded shadow-sm focus:ring-2 focus:ring-blue-500 text-lg bg-white"; // Added bg-white for better visibility
+    window.activeEditableElement.dir = window.correctionAreaEl.dir; // Match text direction
+
     window.activeEditableElement.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
-        e.preventDefault();
-        e.stopPropagation();
+        e.preventDefault(); // Prevent newline in contenteditable
+        e.stopPropagation(); // Prevent global handler from re-triggering edit
         commitWordEdit();
       } else if (e.key === "Escape") {
-        e.preventDefault();
-        e.stopPropagation();
+        e.preventDefault(); // Prevent other Esc actions
+        e.stopPropagation(); // Prevent global handler
         cancelWordEdit();
       }
+      // Allow other keys like space, characters, arrows to be handled by contenteditable
     });
+
     window.activeEditableElement.addEventListener("blur", () => {
+      // Use a small timeout to allow click on another button (like submit) to process first
+      // or to allow Escape/Enter handlers to run before blur commits.
       setTimeout(() => {
         if (window.isEditingWord && window.activeEditableElement)
           commitWordEdit();
-      }, 0);
+      }, 0); // setTimeout with 0ms defers execution until after current call stack
     });
+
     wordSpanToReplace.replaceWith(window.activeEditableElement);
-    window.activeEditableElement.focus(); // Attempt to focus
+    window.activeEditableElement.focus(); // Focus the new editable element
+
+    // Select all text within the contenteditable span
     const range = document.createRange();
     range.selectNodeContents(window.activeEditableElement);
     const selection = window.getSelection();
     selection.removeAllRanges();
     selection.addRange(range);
   }
-  // END OF CLEANED initiateWordEdit FUNCTION
   window.initiateWordEdit = initiateWordEdit;
 
   function commitWordEdit() {
     if (!window.isEditingWord || !window.activeEditableElement) return;
+
     const newWord = window.activeEditableElement.textContent.trim();
     const originalIndexOfEditedWord = window.selectedWordIndex;
+
     if (newWord) {
       window.correctedWords[originalIndexOfEditedWord] = newWord;
     } else {
+      // Word was made empty, so delete it
       window.correctedWords.splice(originalIndexOfEditedWord, 1);
-      // This logic for selectedWordIndex after deletion might need review for all edge cases,
-      // but current tests cover the main scenarios.
-      if (
-        originalIndexOfEditedWord >= window.correctedWords.length &&
-        window.correctedWords.length > 0
-      ) {
-        window.selectedWordIndex = window.correctedWords.length - 1;
-      } else if (window.correctedWords.length === 0) {
-        window.selectedWordIndex = -1;
-      } else if (originalIndexOfEditedWord >= window.correctedWords.length) {
-        // This case is likely similar to the one above it or means original was last and deleted
-        window.selectedWordIndex =
-          window.correctedWords.length > 0
-            ? window.correctedWords.length - 1
-            : -1;
-      }
-      // If a word was deleted, and it wasn't the last one, selectedWordIndex might need to stay same
-      // or be originalIndexOfEditedWord if it's still valid.
-      // The selectWord calls below will handle final selection.
     }
+
     window.isEditingWord = false;
     window.activeEditableElement = null;
-    renderCorrectionArea();
+    // renderCorrectionArea(); // selectWord below will call this
 
     // Determine new selection after commit
     if (window.correctedWords.length === 0) {
-      selectWord(-1);
+      selectWord(-1); // No words left, clear selection
     } else {
       if (newWord) {
         // Word was edited (not made empty)
         if (originalIndexOfEditedWord + 1 < window.correctedWords.length) {
           selectWord(originalIndexOfEditedWord + 1); // Move to next word
         } else {
-          selectWord(originalIndexOfEditedWord); // Stay on current (possibly new text, same index)
+          // It was the last word or became the last after an edit (no length change)
+          selectWord(originalIndexOfEditedWord); // Stay on current (now new text, same index)
         }
       } else {
         // Word was made empty and thus deleted
@@ -256,26 +256,35 @@ function initializeApp() {
 
   function cancelWordEdit() {
     if (!window.isEditingWord) return;
+
+    // No changes to correctedWords needed, just revert UI
     window.isEditingWord = false;
     window.activeEditableElement = null;
-    renderCorrectionArea();
+    // renderCorrectionArea(); // selectWord below will call this
+
+    // Restore selection to the word that was being edited
     if (window.selectedWordIndex !== -1 && window.correctedWords.length > 0) {
       selectWord(window.selectedWordIndex);
     } else if (window.correctedWords.length === 0) {
+      // Should not happen if we were editing a word, but as a safeguard
       selectWord(-1);
     }
-    window.correctionAreaEl.focus();
+    window.correctionAreaEl.focus(); // Return focus to the general correction area
   }
   window.cancelWordEdit = cancelWordEdit;
 
+  // --- START OF MODIFIED deleteSelectedWord ---
   function deleteSelectedWord() {
     if (
       window.isEditingWord ||
       window.selectedWordIndex < 0 ||
       window.selectedWordIndex >= window.correctedWords.length
-    )
+    ) {
       return;
+    }
+
     window.correctedWords.splice(window.selectedWordIndex, 1);
+
     if (window.correctedWords.length === 0) {
       window.selectedWordIndex = -1;
     } else if (window.selectedWordIndex >= window.correctedWords.length) {
@@ -284,35 +293,45 @@ function initializeApp() {
     }
     // If a word in the middle was deleted, selectedWordIndex remains the same,
     // and the word at that index is now the one that was after the deleted one.
-    renderCorrectionArea();
-    selectWord(window.selectedWordIndex); // Re-select to ensure UI update and scroll
+
+    // selectWord will call renderCorrectionArea, handle highlighting, scrolling.
+    selectWord(window.selectedWordIndex);
     window.correctionAreaEl.focus();
   }
   window.deleteSelectedWord = deleteSelectedWord;
+  // --- END OF MODIFIED deleteSelectedWord ---
 
   function loadSentence(index) {
-    window.currentSentenceIndex = index;
+    window.currentSentenceIndex = index; // Update global currentSentenceIndex
+
     if (index >= window.sentencePairs.length) {
       window.allCompleted = true;
+      // Consider removing global key listener when all completed
       document.removeEventListener("keydown", globalKeyHandler);
+      // Hide help button and modal if open
       window.helpToggleBtn.classList.add("hidden");
-      if (isHelpModalOpen) hideHelpModal(true);
+      if (isHelpModalOpen) hideHelpModal(true); // Force hide if open
+
       window.appContainer.innerHTML = `<div class="text-center p-10"><h2 class="text-3xl font-bold text-green-600">Completed!</h2><p class="text-gray-700 mt-4">All sentences have been processed.</p></div>`;
       return;
     }
+
     const pair = window.sentencePairs[index];
     window.sourceSentenceEl.textContent = pair.source;
     window.llmTargetSentenceEl.textContent = pair.target;
-    window.originalTargetForReset = pair.target;
-    window.correctedWords = normalizeWords(pair.target);
-    window.selectedWordIndex = window.correctedWords.length > 0 ? 0 : -1;
-    window.isEditingWord = false;
-    renderCorrectionArea();
+    window.originalTargetForReset = pair.target; // Store for reset functionality
+    window.correctedWords = normalizeWords(pair.target); // Update global correctedWords
+    window.selectedWordIndex = window.correctedWords.length > 0 ? 0 : -1; // Reset selection
+    window.isEditingWord = false; // Ensure not in editing mode
+    // renderCorrectionArea(); // selectWord will call this
+
     if (window.selectedWordIndex !== -1) {
-      selectWord(window.selectedWordIndex);
+      selectWord(window.selectedWordIndex); // This also calls renderCorrectionArea
     } else {
-      window.correctionAreaEl.focus();
+      renderCorrectionArea(); // If no words, still need to render the empty message
+      window.correctionAreaEl.focus(); // Focus correction area if empty
     }
+
     window.statusTextEl.textContent = `Sentence ${index + 1} of ${
       window.sentencePairs.length
     }`;
@@ -320,26 +339,33 @@ function initializeApp() {
   window.loadSentence = loadSentence;
 
   function handleSubmit() {
-    if (window.allCompleted || window.isEditingWord) return;
+    if (window.allCompleted || window.isEditingWord) return; // Prevent submit if editing
+
+    // For PoC, just log the data. In a real app, this would send to a server.
     const currentData = {
       originalSource: window.sentencePairs[window.currentSentenceIndex].source,
-      originalTarget: window.sentencePairs[window.currentSentenceIndex].target,
-      correctedTarget: window.correctedWords.join(" "),
+      originalTarget: window.sentencePairs[window.currentSentenceIndex].target, // The LLM original
+      correctedTarget: window.correctedWords.join(" "), // The user's version
     };
     // console.log("Submitted Data:", JSON.stringify(currentData));
+
+    // Load the next sentence
     loadSentence(window.currentSentenceIndex + 1);
   }
   window.handleSubmit = handleSubmit;
 
   function handleReset() {
-    if (window.allCompleted || window.isEditingWord) return;
+    if (window.allCompleted || window.isEditingWord) return; // Prevent reset if editing
+
     window.correctedWords = normalizeWords(window.originalTargetForReset);
     window.selectedWordIndex = window.correctedWords.length > 0 ? 0 : -1;
-    window.isEditingWord = false;
-    renderCorrectionArea();
+    window.isEditingWord = false; // Ensure not in editing mode
+    // renderCorrectionArea(); // selectWord handles this or direct render if empty
+
     if (window.selectedWordIndex !== -1) {
       selectWord(window.selectedWordIndex);
     } else {
+      renderCorrectionArea(); // Render empty message
       window.correctionAreaEl.focus();
     }
   }
@@ -348,14 +374,14 @@ function initializeApp() {
   function showHelpModal() {
     elementThatHadFocusBeforeModal = document.activeElement;
     window.helpModal.classList.remove("hidden");
-    window.helpModal.classList.add("flex");
+    window.helpModal.classList.add("flex"); // Use flex for centering
     isHelpModalOpen = true;
-    window.closeHelpModalBtn.focus();
+    window.closeHelpModalBtn.focus(); // Focus the close button in the modal
   }
   window.showHelpModal = showHelpModal;
 
   function hideHelpModal(force = false) {
-    if (!isHelpModalOpen && !force) return;
+    if (!isHelpModalOpen && !force) return; // Don't do anything if already hidden unless forced
     window.helpModal.classList.add("hidden");
     window.helpModal.classList.remove("flex");
     isHelpModalOpen = false;
@@ -365,7 +391,7 @@ function initializeApp() {
     ) {
       elementThatHadFocusBeforeModal.focus();
     } else {
-      window.correctionAreaEl.focus();
+      window.correctionAreaEl.focus(); // Fallback focus
     }
   }
   window.hideHelpModal = hideHelpModal;
@@ -375,36 +401,48 @@ function initializeApp() {
   }
   window.toggleHelpModal = toggleHelpModal;
 
+  // --- START OF MODIFIED globalKeyHandler ---
   function globalKeyHandler(e) {
     if (window.allCompleted) return;
+
+    // Handle modal-specific keys first if modal is open
     if (isHelpModalOpen) {
       if (e.key === "Escape" || e.key === "F1" || e.key === "?") {
         e.preventDefault();
         hideHelpModal();
       }
-      return;
+      return; // No other global keys should function when help modal is open
     }
+
+    // Toggle help modal
     if (!window.isEditingWord && (e.key === "F1" || e.key === "?")) {
       e.preventDefault();
       showHelpModal();
       return;
     }
+
+    // Submit
     if (e.ctrlKey && e.key === "Enter") {
       e.preventDefault();
       handleSubmit();
       return;
     }
+
+    // If we are in word editing mode, and the active element IS the editable span,
+    // then let the editable span's own handlers (Enter, Esc) deal with it.
     if (window.isEditingWord) {
       if (document.activeElement === window.activeEditableElement) {
         return;
       }
     }
+
     const activeTag = document.activeElement
       ? document.activeElement.tagName
       : null;
     const activeIsContentEditable = document.activeElement
       ? document.activeElement.isContentEditable
       : false;
+
     if (
       e.key === " " &&
       (activeTag === "BUTTON" ||
@@ -415,6 +453,7 @@ function initializeApp() {
     ) {
       return;
     }
+
     switch (e.key) {
       case " ":
         e.preventDefault();
@@ -435,23 +474,24 @@ function initializeApp() {
         e.stopImmediatePropagation();
         moveSelection(1);
         break;
-      case "Enter":
+      case "Enter": // Fall-through
       case "F2":
         if (window.selectedWordIndex !== -1 && !window.isEditingWord) {
           e.preventDefault();
-          // e.stopImmediatePropagation(); // Consider if Enter/F2 also misbehaves later
           initiateWordEdit();
         }
         break;
-      case "Delete":
+      case "Delete": // Fall-through
       case "Backspace":
         if (window.selectedWordIndex !== -1 && !window.isEditingWord) {
           e.preventDefault();
+          e.stopImmediatePropagation(); // MODIFIED: Added stopImmediatePropagation
           deleteSelectedWord();
         }
         break;
       case "Escape":
         if (!window.isEditingWord) {
+          // Only if not editing (edit Esc is handled by contenteditable listener)
           e.preventDefault();
           handleReset();
         }
@@ -459,44 +499,58 @@ function initializeApp() {
     }
   }
   window.globalKeyHandler = globalKeyHandler;
+  // --- END OF MODIFIED globalKeyHandler ---
 
+  // Event Listeners Setup
   window.submitBtn.addEventListener("click", handleSubmit);
   window.resetBtn.addEventListener("click", handleReset);
   window.helpToggleBtn.addEventListener("click", toggleHelpModal);
   window.closeHelpModalBtn.addEventListener("click", hideHelpModal);
 
-  document.removeEventListener("keydown", globalKeyHandler);
+  // Global key listener - make sure it's added only once if initializeApp can be called multiple times
+  document.removeEventListener("keydown", globalKeyHandler); // Remove first to prevent duplicates
   document.addEventListener("keydown", globalKeyHandler);
 
-  window.removeEventListener("keydown", window._globalFKeyHandler);
+  // Special handling for F1/F2 to prevent default browser actions (like help menu)
+  // This needs to be a separate listener as globalKeyHandler might be prevented by stopPropagation
+  // from contenteditable elements.
+  window.removeEventListener("keydown", window._globalFKeyHandler); // Clean up previous if any
   window._globalFKeyHandler = function (e) {
-    if (e.key === "F1") e.preventDefault();
+    if (e.key === "F1") e.preventDefault(); // Always prevent F1 default
     if (
       e.key === "F2" &&
       !window.isEditingWord &&
       window.selectedWordIndex !== -1 &&
-      !isHelpModalOpen
-    )
+      !isHelpModalOpen // Only prevent F2 if we are going to use it for editing
+    ) {
       e.preventDefault();
+    }
   };
   window.addEventListener("keydown", window._globalFKeyHandler);
 
+  // Load the initial sentence
   loadSentence(window.currentSentenceIndex);
 }
+// End of initializeApp
 
+// Ensure initializeApp is available globally
 if (typeof window !== "undefined") {
   window.initializeApp = initializeApp;
 }
 
+// Auto-initialize the app once the DOM is ready
+// This handles the case where the script is in <head> or loaded async
 if (
   typeof window !== "undefined" &&
   typeof window.initializeApp === "function" &&
   document.readyState !== "loading"
 ) {
+  // DOM is already ready
   window.initializeApp();
 } else if (
   typeof window !== "undefined" &&
   typeof window.initializeApp === "function"
 ) {
+  // Wait for DOMContentLoaded
   document.addEventListener("DOMContentLoaded", window.initializeApp);
 }
