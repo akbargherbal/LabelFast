@@ -1,4 +1,4 @@
-IMPORTANT INSTRUCTIONS FOR ALL SESSSIONS:
+## IMPORTANT INSTRUCTIONS FOR ALL SESSSIONS:
 When providing code modifications, adhere to the following presentation guidelines:
 
 1.  **For minor changes confined to a single function or a small, clearly defined block of code (e.g., changing, adding, or removing a few lines):** You must provide the **entire modified function** or block, clearly indicating the start and end of this block. Do not provide only the changed lines or diff-like patches.
@@ -235,5 +235,89 @@ In both cases, you should still provide your reasoning and identify the location
     - **Step 5.D (Manual Spot-Check & Regression):** Briefly check deletion in browser; re-run all previous modules' tests.
     - **Step 5.E (Documentation & Commit):** Update `PoC_Hardening_Guide.md` and commit changes.
 3.  Continue iteratively through the modules defined in `PoC_Hardening_Guide.md`.
+
+---
+
+## Session 4 Context
+
+**Date:** 2025-05-23
+
+**Input from Previous Sessions:**
+
+- `v003.html`, `app.js` (updated from Session 3), `README.md`, `LGID_FE.md`, `PoC_Interaction_Spec.md`.
+- `PoC_Hardening_Guide.md` (updated for Modules 1-4).
+- Jest testing environment, `__tests__/initial_load.test.js`, `__tests__/correction_area_rendering.test.js`, `__tests__/word_selection_navigation.test.js`, `__tests__/word_editing_flow.test.js`.
+
+**Session 3 Summary (Recap):**
+
+1.  **Module 3 (Word Selection & Navigation):** Completed and verified. `app.js` updated (e.g., `stopImmediatePropagation` for space/arrow keys). `__tests__/word_selection_navigation.test.js` (21 tests) created and passing.
+2.  **Module 4 (Word Editing Flow):** Completed and verified. `app.js` stable for this module. `__tests__/word_editing_flow.test.js` (14 tests) created and passing. `PoC_Hardening_Guide.md` updated for Modules 3 & 4.
+3.  Total tests at end of Session 3: 59.
+
+---
+
+**Session 4 Activities & Outcomes:**
+
+1.  **Reviewed Plan:** Confirmed focus on Module 5.
+2.  **Phase 5-HR (Module 5: Word Deletion):**
+    - **Target JS:** `deleteSelectedWord()`, relevant part of `globalKeyHandler()` (`Delete`, `Backspace`).
+    - **Step 5.A (Generate Tests):** Created `__tests__/word_deletion.test.js`. Drafted 11 comprehensive tests covering:
+      - Deletion via 'Delete' and 'Backspace' keys.
+      - Correct removal of words from `correctedWords`.
+      - Appropriate selection updates (first, middle, last, only word).
+      - Handling of empty state after deleting the only word.
+      - UI re-rendering (verified by checking `getCorrectionAreaWords()` and `getSelectedWordSpan()`).
+      - Guard conditions (no deletion if no word selected or if `isEditingWord` is true).
+      - Verification of `e.preventDefault()` and `correctionAreaEl.focus()` calls.
+    - **Step 5.B (Execute Tests) & 5.C (Refine/Fix PoC JavaScript):**
+      - Initial tests revealed an issue where `correctedWords` became empty unexpectedly for multi-word deletions, and `correctionAreaEl.focus()` calls were not always matching expectations.
+      - **Refinement 1 (app.js):** Modified `deleteSelectedWord()` to remove a redundant `renderCorrectionArea()` call (as `selectWord()` already calls it).
+      - **Refinement 2 (app.js):** Added `e.stopImmediatePropagation()` to the 'Delete' and 'Backspace' cases in `globalKeyHandler` to prevent potential multiple invocations. This was key to fixing the array emptying issue.
+      - **Refinement 3 (test.js):** Corrected the focus assertion in `__tests__/word_deletion.test.js` to use `mockFocus.mock.instances.toContain(window.correctionAreaEl)` for prototype spies.
+      - **Refinement 4 (test.js):** Adjusted focus assertion logic for guard condition tests to check that _no additional_ focus call was made by `deleteSelectedWord`, rather than asserting no focus call at all on `correctionAreaEl`.
+      - **Syntax Error Fix (test.js):** Corrected a nesting issue in `__tests__/word_deletion.test.js` where two tests were outside their parent `describe` block.
+      - After these iterations, all 11 tests for Module 5 passed.
+    - **Step 5.D (Manual Spot-Check & Regression):**
+      - All previous modules' tests (59 tests) re-ran and passed.
+      - User confirmed manual spot-check of word deletion in the browser is working as expected.
+    - **Step 5.E (Documentation & Commit):**
+      - `PoC_Hardening_Guide.md` updated to mark Module 5 as "Verified & Hardened".
+      - User confirmed all changes (updated `app.js`, new `__tests__/word_deletion.test.js`, updated `PoC_Hardening_Guide.md`) are committed.
+    - **Module 5 Completion:** Module 5 is "COMPLETE & VERIFIED".
+
+**Current LGID-HR Stage (End of Session 4):**
+
+- **Phase 0-HR: COMPLETE.**
+- **Phase 1-HR (Module 1: Initial State & Sentence Loading): COMPLETE & VERIFIED.** (7 tests)
+- **Phase 2-HR (Module 2: Word Tokenization & Rendering in Correction Area): COMPLETE & VERIFIED.** (17 tests)
+- **Phase 3-HR (Module 3: Word Selection & Navigation): COMPLETE & VERIFIED.** (21 tests)
+- **Phase 4-HR (Module 4: Word Editing Flow (ContentEditable)): COMPLETE & VERIFIED.** (14 tests)
+- **Phase 5-HR (Module 5: Word Deletion): COMPLETE & VERIFIED.** (11 tests)
+  - Total tests passed: 7 + 17 + 21 + 14 + 11 = **70 tests**.
+  - `app.js` updated with fixes in `deleteSelectedWord` and `globalKeyHandler`.
+
+---
+
+**Plan for Next Session (Session 5):**
+
+1.  **(Git Workflow):**
+    - (Already done by user for Session 4 changes).
+2.  **Begin Phase 6-HR (Module 6: Sentence Reset Functionality):**
+    - Refer to `PoC_Hardening_Guide.md` for Module 6's scope:
+      - **Target JS:** `handleReset()`, `resetBtn` click listener, relevant part of `globalKeyHandler()` (`Esc`).
+      - **Key Test Scenarios/Objectives:**
+        - Clicking `#resetBtn` calls `handleReset()`.
+        - Pressing `Esc` (when not editing and help modal closed) calls `handleReset()`.
+        - `correctedWords` is reverted to `originalTargetForReset`.
+        - `selectedWordIndex` is reset (typically to first word or -1 if empty after reset).
+        - `#correctionArea` re-renders with original words.
+        - `isEditingWord` is false (should be ensured, though reset typically happens when not editing).
+        - `correctionAreaEl.focus()` or appropriate element focus after reset.
+    - **Step 6.A (Generate Tests):** Collaboratively generate a new test file (e.g., `__tests__/sentence_reset.test.js`).
+    - **Step 6.B (Execute Tests):** Run new tests.
+    - **Step 6.C (Refine/Fix PoC JavaScript):** Refine/fix `app.js` until Module 6 tests pass.
+    - **Step 6.D (Manual Spot-Check & Regression):** Briefly check reset functionality in browser; re-run all previous modules' tests (70 tests).
+    - **Step 6.E (Documentation & Commit):** Update `PoC_Hardening_Guide.md` and commit changes.
+3.  Continue iteratively through the modules defined in `PoC_Hardening_Guide.md` (Modules 7, 8, 9 remain).
 
 ---
