@@ -19,7 +19,6 @@ function initializeApp() {
 
   let currentSentenceIndex = 0;
   let correctedWords = [];
-  // let selectedWordIndex = -1; // This local variable is effectively superseded by window.selectedWordIndex
   let isEditingWord = false;
   let activeEditableElement = null;
   let originalTargetForReset = "";
@@ -39,11 +38,10 @@ function initializeApp() {
   let isHelpModalOpen = false;
   let elementThatHadFocusBeforeModal;
 
-  // Expose necessary variables/functions to the window object for tests
   window.sentencePairs = sentencePairs;
   window.currentSentenceIndex = currentSentenceIndex;
   window.correctedWords = correctedWords;
-  window.selectedWordIndex = -1; // Initialize global selectedWordIndex
+  window.selectedWordIndex = -1;
   window.isEditingWord = isEditingWord;
   window.activeEditableElement = activeEditableElement;
   window.originalTargetForReset = originalTargetForReset;
@@ -58,7 +56,7 @@ function initializeApp() {
     window.correctionAreaEl.innerHTML = "";
     if (window.correctedWords.length === 0 && !window.isEditingWord) {
       window.correctionAreaEl.innerHTML = `<span class="text-gray-400 italic">Sentence is empty. Use controls if needed.</span>`;
-      window.selectedWordIndex = -1; // Ensure selectedWordIndex is -1 for empty state
+      window.selectedWordIndex = -1;
       return;
     }
 
@@ -99,24 +97,25 @@ function initializeApp() {
   }
   window.renderCorrectionArea = renderCorrectionArea;
 
+  // START OF REFACTORED selectWord FUNCTION
   function selectWord(index) {
     if (window.isEditingWord) {
       return;
     }
+
     if (window.correctedWords.length === 0) {
       window.selectedWordIndex = -1;
-    } else if (index >= 0 && index < window.correctedWords.length) {
-      window.selectedWordIndex = index;
-    } else if (index < 0 && window.correctedWords.length > 0) {
-      window.selectedWordIndex = 0;
-    } else if (
-      index >= window.correctedWords.length &&
-      window.correctedWords.length > 0
-    ) {
-      window.selectedWordIndex = window.correctedWords.length - 1;
     } else {
-      window.selectedWordIndex = -1;
+      // At this point, window.correctedWords.length > 0 is guaranteed
+      if (index < 0) {
+        window.selectedWordIndex = 0; // Select first word
+      } else if (index >= window.correctedWords.length) {
+        window.selectedWordIndex = window.correctedWords.length - 1; // Select last word
+      } else {
+        window.selectedWordIndex = index; // Index is valid and in-bounds
+      }
     }
+
     renderCorrectionArea();
     const selectedSpan = window.correctionAreaEl.querySelector(
       `span[data-index='${window.selectedWordIndex}']`
@@ -129,10 +128,13 @@ function initializeApp() {
       });
     }
   }
+  // END OF REFACTORED selectWord FUNCTION
   window.selectWord = selectWord;
 
   function moveSelection(direction) {
-    if (window.isEditingWord || window.correctedWords.length === 0) return;
+    if (window.isEditingWord || window.correctedWords.length === 0) {
+      return;
+    }
     let newIndex = window.selectedWordIndex + direction;
     if (newIndex < 0) {
       newIndex = window.correctedWords.length - 1;
@@ -304,7 +306,7 @@ function initializeApp() {
       originalTarget: window.sentencePairs[window.currentSentenceIndex].target,
       correctedTarget: window.correctedWords.join(" "),
     };
-    console.log("Submitted Data:", JSON.stringify(currentData)); // Kept for PoC visibility
+    // console.log("Submitted Data:", JSON.stringify(currentData));
     loadSentence(window.currentSentenceIndex + 1);
   }
   window.handleSubmit = handleSubmit;
@@ -396,6 +398,7 @@ function initializeApp() {
     switch (e.key) {
       case " ":
         e.preventDefault();
+        e.stopImmediatePropagation();
         if (e.shiftKey) {
           moveSelection(-1);
         } else {
@@ -404,10 +407,12 @@ function initializeApp() {
         break;
       case "ArrowLeft":
         e.preventDefault();
+        e.stopImmediatePropagation();
         moveSelection(-1);
         break;
       case "ArrowRight":
         e.preventDefault();
+        e.stopImmediatePropagation();
         moveSelection(1);
         break;
       case "Enter":
@@ -438,6 +443,7 @@ function initializeApp() {
   window.resetBtn.addEventListener("click", handleReset);
   window.helpToggleBtn.addEventListener("click", toggleHelpModal);
   window.closeHelpModalBtn.addEventListener("click", hideHelpModal);
+
   document.removeEventListener("keydown", globalKeyHandler);
   document.addEventListener("keydown", globalKeyHandler);
 
